@@ -1,115 +1,164 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a1d3d">
 <title>Panel de asistencia · {{INSTITUCION}}</title>
 <link rel="stylesheet" href="/static/estilo.css">
 <style>
-  .barra a{color:#fff;text-decoration:none} .barra .der{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .barra button{padding:.35em .8em;font-size:.85rem;background:rgba(255,255,255,.14)} .barra button.on{background:var(--verde)}
-  nav{display:flex;gap:4px;padding:10px 20px 0;flex-wrap:wrap}
-  nav button{background:transparent;color:var(--suave);border-radius:10px 10px 0 0;padding:.6em 1em}
-  nav button.activo{background:var(--papel);color:var(--tinta);border:1px solid var(--linea);border-bottom-color:var(--papel)}
-  .vista{display:none;padding:16px 20px 30px} .vista.activa{display:block}
-  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-  .chip{padding:10px 14px;min-width:110px} .chip b{display:block;font-size:1.4rem} .chip small{color:var(--suave)}
-  .panel{padding:14px} h3{margin:0 0 10px;font-size:1rem}
-  .fila-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px} .fila-ctl input,.fila-ctl select{width:auto}
-  table{width:100%;border-collapse:collapse;font-size:.9rem} th,td{padding:7px 8px;border-bottom:1px solid var(--linea);text-align:left;vertical-align:middle}
-  th{background:var(--tinta);color:#fff;position:sticky;top:0} .tabla{max-height:65vh;overflow:auto;border-radius:10px}
-  td .acc{display:flex;gap:4px;flex-wrap:wrap} td .acc button{font-size:.75rem;padding:.3em .55em}
-  .foto{width:38px;height:38px;border-radius:8px;object-fit:cover;background:var(--linea);display:block}
-  .feed{max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
-  .ev{padding:8px 10px;border-radius:10px;background:#fff;border:1px solid var(--linea);font-size:.88rem}
-  .ev.alta{border-left:5px solid var(--rojo)} .ev time{color:var(--suave);font-size:.75rem;margin-right:6px}
-  .camara img{width:100%;max-width:900px;border-radius:10px;background:#000;display:block;min-height:140px}
-  .toasts{position:fixed;top:70px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:20;max-width:360px}
-  .toast{background:var(--tinta);color:#fff;padding:12px 14px;border-radius:12px;box-shadow:var(--sombra);border-left:6px solid var(--verde);font-weight:600;cursor:pointer}
-  .toast.alta{border-left-color:var(--rojo)}
-  .form{display:grid;grid-template-columns:1fr 1.4fr 1.4fr 1fr 1fr auto;gap:8px;margin-top:12px}
-  @media(max-width:700px){.form{grid-template-columns:1fr 1fr}}
+  .vista{display:none;padding:4px 28px 32px} .vista.activa{display:block;animation:entra .25s ease}
+  @keyframes entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .kpis{margin-bottom:20px}
+  .superior button.on{background:var(--verde);color:#fff;border-color:transparent}
+  .panel{overflow:hidden}
+  .panel-cab{padding:20px 22px 14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+  .panel-cab h3{margin:0;font-size:1.2rem;color:var(--marino-900)} .panel-cab p{margin:3px 0 0;color:var(--suave);font-size:.86rem}
+  .filtros{padding:4px 22px 18px;display:flex;gap:12px 16px;flex-wrap:wrap;align-items:flex-end}
+  .campo{display:flex;flex-direction:column;gap:6px}
+  .campo label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em}
+  .campo input,.campo select{width:auto;padding:.55em .9em}
+  .chk{display:flex;gap:9px;align-items:center;font-size:.88rem;color:var(--tinta);font-weight:600;padding-bottom:10px;cursor:pointer}
+  .buscador span{position:relative;display:block} .buscador svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:17px;height:17px;color:var(--tenue)}
+  .buscador input{padding-left:36px;min-width:230px}
+  .horario{display:inline-flex;align-items:center;gap:8px;color:var(--marino-700);background:var(--marino-50);border-radius:999px;padding:.45em 1em;font-size:.84rem;font-weight:600;margin-bottom:6px}
+  .horario:empty{display:none}
+  .tabla{max-height:62vh;overflow:auto;padding:0 12px 12px}
+  table{width:100%;border-collapse:separate;border-spacing:0 6px;font-size:.9rem}
+  th{position:sticky;top:0;z-index:1;background:var(--papel);color:var(--tenue);font-size:.7rem;text-transform:uppercase;letter-spacing:.09em;font-weight:700;text-align:left;padding:10px 12px;white-space:nowrap}
+  td{padding:11px 12px;background:var(--marino-50);text-align:left;vertical-align:middle}
+  td:first-child{border-radius:14px 0 0 14px} td:last-child{border-radius:0 14px 14px 0}
+  tbody tr:hover td{background:var(--naranja-50)}
+  td small{color:var(--suave)}
+  td .acc{display:flex;gap:5px;flex-wrap:wrap} td .acc button{font-size:.74rem;padding:.4em .8em}
+  .foto{width:42px;height:42px;border-radius:50%;object-fit:cover;background:var(--marino-100);display:block;border:2px solid #fff;box-shadow:0 0 0 2px var(--marino-100)}
+  span.foto{background:repeating-linear-gradient(45deg,var(--marino-50),var(--marino-50) 4px,var(--marino-100) 4px,var(--marino-100) 8px)}
+  .feed{max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:0 22px 22px}
+  .ev{padding:12px 16px;border-radius:14px;background:var(--marino-50);font-size:.9rem;display:flex;gap:12px;align-items:baseline}
+  .ev::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--marino-300);flex:none;transform:translateY(-1px)}
+  .ev.alta{background:var(--rojo-fondo);color:var(--rojo-texto)} .ev.alta::before{background:var(--rojo)}
+  .ev time{color:var(--tenue);font-size:.76rem;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .camara-cuerpo{padding:0 22px 22px} .camara img{width:100%;border-radius:16px;background:var(--marino-950);display:block;min-height:260px;color:#9aa6ba;text-align:center}
+  .toasts{position:fixed;top:20px;right:20px;display:flex;flex-direction:column;gap:10px;z-index:50;max-width:380px}
+  .toast{background:#fff;color:var(--tinta);padding:14px 16px;border-radius:16px;box-shadow:var(--sombra-2);font-weight:600;cursor:pointer;display:flex;gap:12px;align-items:center;animation:desliza .3s ease}
+  .toast::before{content:"✓";width:30px;height:30px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;flex:none}
+  .toast.alta::before{content:"!";background:var(--rojo)}
+  @keyframes desliza{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+  .form{display:grid;grid-template-columns:1fr 1.4fr 1.4fr 1fr 1fr auto;gap:10px;padding:16px 22px 22px}
+  .nota{margin:0 22px 12px;padding:12px 16px;color:#7a3d06;font-size:.88rem;background:var(--naranja-50);border-radius:14px}
+  .exportar{display:flex;gap:6px;flex-wrap:wrap} .exportar button{font-size:.8rem;padding:.5em .9em}
+  #rInfo{margin:0 22px 8px;color:var(--suave);font-size:.88rem} #rInfo:empty{display:none}
+  @media(max-width:860px){.vista{padding:4px 12px 24px}.form{grid-template-columns:1fr 1fr}.campo select{min-width:0!important;width:100%}.filtros .campo{flex:1 1 140px}
+    .toasts{top:auto;bottom:90px;left:12px;right:12px}}
 </style></head>
 <body>
-<div class="barra">
-  <div class="marca">{{USUARIO}}<small>Panel de asistencia · Gestión {{GESTION}}</small></div>
-  <div class="der">
-    <span class="pildora"><span class="punto" id="ptCam"></span><span id="txtCam">Cámara…</span></span>
-    <button id="btnSonido" onclick="activarSonido()">🔇 Activar sonido</button>
-    <a href="/admin/qr" target="_blank"><button>Cartel QR</button></a>
-    <a href="/" target="_blank"><button>Vista pública</button></a>
-    <a href="/logout"><button>Salir</button></a>
-  </div>
-</div>
-<nav>
-  <button class="activo" data-v="hoy">Asistencia</button>
-  <button data-v="alertas">Alertas</button>
-  <button data-v="estudiantes" id="tabEst" hidden>Estudiantes</button>
-  <button data-v="reportes">Reportes</button>
-  <button data-v="camara">Cámara</button>
-</nav>
-<div class="toasts" id="toasts"></div>
+<div class="app">
+  <aside class="lateral">
+    <div class="marca"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
+      <span><b>Asistencia</b><small>Gestión {{GESTION}}</small></span></div>
+    <div class="grupo">Menú</div>
+    <nav>
+      <button class="activo" data-v="hoy" data-t="Asistencia del día"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>Asistencia</button>
+      <button data-v="alertas" data-t="Alertas y movimientos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alertas</button>
+      <button data-v="estudiantes" data-t="Estudiantes" id="tabEst" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M17 3.5a4 4 0 0 1 0 9M22 21c0-3-1.8-5.6-4.5-6.6"/></svg>Estudiantes</button>
+      <button data-v="reportes" data-t="Reportes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-6"/></svg>Reportes</button>
+      <button data-v="camara" data-t="Cámara en vivo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>Cámara</button>
+    </nav>
+    <div class="abajo">
+      <div class="grupo">Accesos</div>
+      <a class="btn item" href="/admin/qr" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v7h-7"/></svg>Cartel QR</a>
+      <a class="btn item" href="/" target="_blank"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Vista pública</a>
+      <div class="usuario"><div class="avatar" id="avatar">A</div><div style="min-width:0"><b id="nomUsuario">{{USUARIO}}</b><small>Sesión iniciada</small></div></div>
+      <a class="btn item" href="/logout"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>Cerrar sesión</a>
+    </div>
+  </aside>
 
+  <div class="contenido">
+    <header class="superior">
+      <div><h1 id="tituloVista">Asistencia del día</h1><p>{{INSTITUCION}} · Gestión {{GESTION}}</p></div>
+      <div class="der">
+        <span class="pildora"><span class="punto" id="ptCam"></span><span id="txtCam">Cámara…</span></span>
+        <button class="sec" id="btnSonido" onclick="activarSonido()">🔇 Activar sonido</button>
+      </div>
+    </header>
+    <div class="toasts" id="toasts"></div>
+    <main>
 <section class="vista activa" id="v-hoy">
-  <div class="chips">
-    <div class="tarjeta chip"><b id="kPres">–</b><small>presentes</small></div>
-    <div class="tarjeta chip"><b id="kPun" style="color:var(--verde)">–</b><small>puntuales</small></div>
-    <div class="tarjeta chip"><b id="kAtr" style="color:var(--naranja)">–</b><small>atrasos</small></div>
-    <div class="tarjeta chip"><b id="kJus" style="color:var(--celeste)">–</b><small>justificados</small></div>
-    <div class="tarjeta chip"><b id="kFal" style="color:#8a8374">–</b><small>faltan</small></div>
+  <div class="kpis">
+    <div class="kpi"><small>Presentes</small><b id="kPres">–</b></div>
+    <div class="kpi verde"><small>Puntuales</small><b id="kPun">–</b></div>
+    <div class="kpi ambar"><small>Atrasos</small><b id="kAtr">–</b></div>
+    <div class="kpi celeste"><small>Justificados</small><b id="kJus">–</b></div>
+    <div class="kpi gris"><small>Faltan</small><b id="kFal">–</b></div>
   </div>
   <div class="tarjeta panel">
-    <div class="fila-ctl"><label>Materia:</label><select id="materia" onchange="seguir.checked = false; elegirMateria()" style="min-width:260px"></select>
-      <label style="display:flex;gap:6px;align-items:center;font-size:.9rem"><input type="checkbox" id="seguir" checked style="width:auto"> Seguir la clase en curso</label></div>
-    <div class="fila-ctl"><label>Fecha:</label><input type="date" id="fecha" onchange="actualizar(true)">
-      <input id="filtro" placeholder="Buscar estudiante…" oninput="pintarLista()" style="min-width:200px">
-      <small id="horario" style="color:var(--suave)"></small></div>
+    <div class="panel-cab"><div><h3>Lista de la clase</h3><p>Corrige el estado de cada estudiante con los botones de la derecha.</p></div><span class="horario" id="horario"></span></div>
+    <div class="filtros">
+      <div class="campo"><label for="materia">Materia</label><select id="materia" onchange="seguir.checked = false; elegirMateria()" style="min-width:300px"></select></div>
+      <label class="chk"><input type="checkbox" id="seguir" checked> Seguir la clase en curso</label>
+      <div class="campo"><label for="fecha">Fecha</label><input type="date" id="fecha" onchange="actualizar(true)"></div>
+      <div class="campo buscador"><label for="filtro">Buscar</label>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="filtro" placeholder="Nombre o código…" oninput="pintarLista()"></span></div>
+    </div>
     <div class="tabla"><table><thead><tr><th></th><th>Código</th><th>Estudiante</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Similitud</th><th>Origen</th><th>Corregir</th></tr></thead>
       <tbody id="lista"></tbody></table></div>
   </div>
 </section>
 
 <section class="vista" id="v-alertas">
-  <div class="tarjeta panel"><div class="fila-ctl"><h3 style="margin:0">Alertas y movimientos</h3>
-    <button class="sec" onclick="post('/api/admin/eventos/atender')">Marcar todas como vistas</button></div>
+  <div class="tarjeta panel">
+    <div class="panel-cab"><div><h3>Movimientos recientes</h3><p>Rostros desconocidos, marcas y avisos del sistema en tiempo real.</p></div>
+      <button class="sec" onclick="post('/api/admin/eventos/atender')">✓ Marcar todas como vistas</button></div>
     <div class="feed" id="feed"></div></div>
 </section>
 
 <section class="vista" id="v-estudiantes">
   <div class="tarjeta panel">
-    <h3>Estudiantes</h3>
-    <p style="margin:0 0 10px;color:var(--suave)">El <b>rostro</b> se registra en la laptop (programa de escritorio → «Registrar rostro», con la cámara) <b>o aquí</b> con
-      el botón «📷 Fotos»: toma de 3 a 8 fotos de frente y girando un poco la cabeza, <b>una sola persona por foto</b>.</p>
+    <div class="panel-cab"><div><h3>Estudiantes de la gestión</h3><p>Registro de rostros y altas.</p></div></div>
+    <p class="nota">📷 El <b>rostro</b> se registra en la laptop (programa de escritorio → «Registrar rostro») <b>o aquí</b> con el botón «Fotos»:
+      toma de 3 a 8 fotos de frente y girando un poco la cabeza, <b>una sola persona por foto</b>.</p>
     <input type="file" id="fotosEst" accept="image/*" capture="user" multiple hidden>
     <div class="tabla"><table><thead><tr><th></th><th>Código</th><th>Apellidos</th><th>Nombres</th><th>Semestre</th><th>Curso</th><th>Rostro</th><th>Activo</th><th>Acciones</th></tr></thead><tbody id="tEst"></tbody></table></div>
     <div class="form"><input id="eCod" placeholder="Código / CI"><input id="eNom" placeholder="Nombres"><input id="eApe" placeholder="Apellidos">
       <input id="eCur" placeholder="Carrera / curso"><select id="eSem"><option value="0">Semestre…</option><option value="1">1ro</option><option value="2">2do</option>
       <option value="3">3ro</option><option value="4">4to</option><option value="5">5to</option><option value="6">6to</option></select>
-      <button class="verde" onclick="nuevoEst()">Agregar</button></div>
+      <button class="naranja" onclick="nuevoEst()">+ Agregar</button></div>
   </div>
 </section>
 
 <section class="vista" id="v-reportes">
   <div class="tarjeta panel">
-    <div class="fila-ctl"><label>Materia:</label><select id="rMateria" onchange="reporte()" style="min-width:260px"></select></div>
-    <div class="fila-ctl"><label>Desde</label><input type="date" id="rDesde"><label>hasta</label><input type="date" id="rHasta">
-      <button onclick="reporte()">Ver reporte</button>
-      <button class="sec" onclick="exportar('reporte')">reporte.csv</button><button class="sec" onclick="exportar('asistencias')">asistencias.csv</button>
-      <button class="sec" onclick="exportar('estudiantes')" id="expEst" hidden>estudiantes.csv</button><button class="sec" onclick="exportar('eventos')">eventos.csv</button></div>
-    <p id="rInfo" style="color:var(--suave);margin:0 0 8px"></p>
+    <div class="panel-cab"><div><h3>Reporte por materia</h3><p>Porcentaje de asistencia de cada estudiante en un rango de fechas.</p></div>
+      <div class="exportar">
+        <button class="sec" onclick="exportar('reporte')">⬇ reporte.csv</button><button class="sec" onclick="exportar('asistencias')">⬇ asistencias.csv</button>
+        <button class="sec" onclick="exportar('estudiantes')" id="expEst" hidden>⬇ estudiantes.csv</button><button class="sec" onclick="exportar('eventos')">⬇ eventos.csv</button></div></div>
+    <div class="filtros">
+      <div class="campo"><label for="rMateria">Materia</label><select id="rMateria" onchange="reporte()" style="min-width:300px"></select></div>
+      <div class="campo"><label for="rDesde">Desde</label><input type="date" id="rDesde"></div>
+      <div class="campo"><label for="rHasta">Hasta</label><input type="date" id="rHasta"></div>
+      <button class="naranja" onclick="reporte()">Ver reporte</button>
+    </div>
+    <p id="rInfo"></p>
     <div class="tabla"><table><thead><tr><th>Código</th><th>Estudiante</th><th>Puntual</th><th>Atraso</th><th>Justif.</th><th>Faltas</th><th>Sin salida</th><th>% asistencia</th></tr></thead><tbody id="tRep"></tbody></table></div>
   </div>
 </section>
 
 <section class="vista" id="v-camara">
-  <div class="tarjeta panel camara"><h3>Cámara en vivo <small id="infoCam" style="font-weight:500;color:var(--suave)"></small></h3><img id="video" alt="Sin señal: inicia la cámara en el programa de escritorio"></div>
+  <div class="tarjeta panel camara">
+    <div class="panel-cab"><div><h3>Vista del aula <small id="infoCam" style="font-weight:500;color:var(--naranja-600)"></small></h3><p>Imagen en vivo del reconocimiento facial.</p></div></div>
+    <div class="camara-cuerpo"><img id="video" alt="Sin señal: inicia la cámara en el programa de escritorio"></div></div>
 </section>
+    </main>
+  </div>
+</div>
 
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ESTADO = {puntual:'Puntual', atraso:'Atraso', justificado:'Justificado', falta:'Falta'};
 const hoyISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
-const hora = t => new Date(t*1000).toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
+const hora = t => new Date(t*1000).toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit',hour12:false});
 const ES_ADMIN = {{ES_ADMIN}};
 let ultimo = 0, primera = true, sonido = false, ctx = null, lista = [], materias = [];
 const seguir = document.getElementById('seguir');
+document.getElementById('avatar').textContent = (document.getElementById('nomUsuario').textContent.trim().split(/\s+/).slice(0, 2).map(p => p[0]).join('') || 'A').toUpperCase();
 document.getElementById('tabEst').hidden = !ES_ADMIN; document.getElementById('expEst').hidden = !ES_ADMIN;
 document.getElementById('fecha').value = hoyISO();
 document.getElementById('rHasta').value = hoyISO();
@@ -117,6 +166,8 @@ document.getElementById('rDesde').value = (() => { const d = new Date(); d.setDa
 
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
   document.querySelectorAll('nav button').forEach(x => x.classList.toggle('activo', x === b));
+  document.getElementById('tituloVista').textContent = b.dataset.t;
+  window.scrollTo(0, 0);
   document.querySelectorAll('.vista').forEach(v => v.classList.toggle('activa', v.id === 'v-' + b.dataset.v));
   if (b.dataset.v === 'estudiantes') estudiantes();
   if (b.dataset.v === 'reportes') reporte();
@@ -158,10 +209,10 @@ function pintarLista(){
   const f = document.getElementById('filtro').value.toLowerCase();
   document.getElementById('lista').innerHTML = lista.filter(x => !f || (x.nombre + x.codigo).toLowerCase().includes(f)).map(x => `<tr>
     <td>${x.muestras ? `<img class="foto" src="/foto/${x.estudiante_id}" loading="lazy">` : '<span class="foto" title="Sin rostro registrado"></span>'}</td>
-    <td>${esc(x.codigo)}</td><td>${esc(x.nombre)}${x.observacion ? `<br><small style="color:var(--suave)">${esc(x.observacion)}</small>` : ''}</td>
-    <td><span class="st st-${x.estado}">${ESTADO[x.estado]}</span></td><td>${x.hora ? hora(x.hora) : '—'}</td><td>${x.hora_salida ? hora(x.hora_salida) : x.hora && x.estado !== 'justificado' ? '<span style="color:var(--naranja)">sin salida</span>' : ''}</td>
-    <td>${x.similitud ? x.similitud.toFixed(2) : ''}</td><td>${esc(x.fuente)}</td>
-    <td><div class="acc"><button class="verde" onclick="marcar(${x.estudiante_id},'puntual')">Puntual</button><button class="naranja" onclick="marcar(${x.estudiante_id},'atraso')">Atraso</button>
+    <td class="num"><small>${esc(x.codigo)}</small></td><td><b>${esc(x.nombre)}</b>${x.observacion ? `<br><small>${esc(x.observacion)}</small>` : ''}</td>
+    <td><span class="st st-${x.estado}">${ESTADO[x.estado]}</span></td><td class="num">${x.hora ? hora(x.hora) : '<span style="color:var(--tenue)">—</span>'}</td><td class="num">${x.hora_salida ? hora(x.hora_salida) : x.hora && x.estado !== 'justificado' ? '<small style="color:var(--ambar-texto);font-weight:600">sin salida</small>' : ''}</td>
+    <td class="num"><small>${x.similitud ? x.similitud.toFixed(2) : ''}</small></td><td><small>${esc(x.fuente)}</small></td>
+    <td><div class="acc"><button class="verde" onclick="marcar(${x.estudiante_id},'puntual')">Puntual</button><button class="sec" style="color:var(--ambar-texto)" onclick="marcar(${x.estudiante_id},'atraso')">Atraso</button>
       <button class="sec" onclick="marcar(${x.estudiante_id},'justificado')">Justificar</button>${x.hora ? `<button class="sec" onclick="marcar(${x.estudiante_id},'falta')">Quitar</button>` : ''}${x.hora && !x.hora_salida ? `<button onclick="marcar(${x.estudiante_id},'salida')">Salida</button>` : ''}${x.hora_salida ? `<button class="sec" onclick="marcar(${x.estudiante_id},'sin_salida')">Quitar salida</button>` : ''}</div></td></tr>`).join('');
 }
 async function actualizar(forzar){
@@ -190,8 +241,8 @@ async function estudiantes(){
   const d = await (await fetch('/api/admin/estudiantes')).json();
   document.getElementById('tEst').innerHTML = d.estudiantes.map(e => `<tr><td>${e.muestras ? `<img class="foto" src="/foto/${e.id}" loading="lazy">` : '<span class="foto"></span>'}</td>
     <td>${esc(e.codigo)}</td><td>${esc(e.apellidos)}</td><td>${esc(e.nombres)}</td><td>${e.semestre ? SEM[e.semestre] : '<span style="color:var(--rojo)">sin inscribir</span>'}</td><td>${esc(e.curso)}</td>
-    <td>${e.muestras ? `✅ ${e.muestras} muestras` : '⚠️ sin registrar'}</td><td>${e.activo ? 'sí' : 'no'}</td>
-    <td><div class="acc"><button onclick="subirFotos(${e.id})">📷 Fotos</button>${e.muestras ? `<button class="sec" onclick="borrarRostro(${e.id})">Borrar rostro</button>` : ''}
+    <td>${e.muestras ? `<span class="st st-puntual">${e.muestras} muestras</span>` : '<span class="st st-atraso">sin registrar</span>'}</td><td>${e.activo ? 'sí' : '<span style="color:var(--tenue)">no</span>'}</td>
+    <td><div class="acc"><button class="naranja" onclick="subirFotos(${e.id})">📷 Fotos</button>${e.muestras ? `<button class="sec" onclick="borrarRostro(${e.id})">Borrar rostro</button>` : ''}
       <button class="sec" onclick="eliminarEst(${e.id}, '${esc(e.codigo)}')">Eliminar</button></div></td></tr>`).join('');
 }
 let estFotos = 0;
@@ -226,8 +277,10 @@ async function reporte(){
   const r = await fetch(`/api/admin/reporte?materia=${rMateria.value}&desde=${rDesde.value}&hasta=${rHasta.value}`); const d = await r.json();
   if (!r.ok) return alert(d.error || 'Error');
   document.getElementById('rInfo').textContent = `${d.materia.titulo} · ${d.materia.semestre_texto} semestre · ${d.materia.docente || 'sin docente'}: ${d.dias.length} día(s) de clase entre ${d.desde} y ${d.hasta}.`;
-  document.getElementById('tRep').innerHTML = d.filas.map(f => `<tr><td>${esc(f.codigo)}</td><td>${esc(f.nombre)}</td><td>${f.puntuales}</td><td>${f.atrasos}</td>
-    <td>${f.justificados}</td><td>${f.faltas}</td><td>${f.sin_salida}</td><td><b style="color:${f.porcentaje >= 80 ? 'var(--verde)' : f.porcentaje >= 60 ? 'var(--naranja)' : 'var(--rojo)'}">${f.porcentaje}%</b></td></tr>`).join('');
+  document.getElementById('tRep').innerHTML = d.filas.map(f => { const c = f.porcentaje >= 80 ? 'var(--verde)' : f.porcentaje >= 60 ? 'var(--ambar)' : 'var(--rojo)';
+    return `<tr><td class="num"><small>${esc(f.codigo)}</small></td><td><b>${esc(f.nombre)}</b></td><td class="num">${f.puntuales}</td><td class="num">${f.atrasos}</td>
+    <td class="num">${f.justificados}</td><td class="num">${f.faltas}</td><td class="num">${f.sin_salida}</td>
+    <td><div style="display:flex;align-items:center;gap:10px;min-width:150px"><div class="progreso" style="flex:1"><i style="width:${Math.min(100, f.porcentaje)}%;background:${c}"></i></div><b class="num" style="color:${c};min-width:48px;text-align:right">${f.porcentaje}%</b></div></td></tr>`; }).join('');
 }
 function exportar(tipo){ location.href = `/admin/exportar/${tipo}.csv?materia=${rMateria.value || 0}&desde=${rDesde.value}&hasta=${rHasta.value}`; }
 const SEM = ['', '1ro', '2do', '3ro', '4to', '5to', '6to'];

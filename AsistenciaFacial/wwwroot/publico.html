@@ -1,61 +1,105 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#06132a">
 <title>Asistencia de hoy · {{INSTITUCION}}</title>
 <link rel="stylesheet" href="/static/estilo.css">
 <style>
-  main{max-width:1100px;margin:0 auto;padding:18px 16px}
-  .cab{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
-  h1{font-size:1.6rem;margin:6px 0 2px} .sub{color:var(--suave);margin:0}
-  .reloj{font-size:2.6rem;font-weight:800;color:var(--azul);font-variant-numeric:tabular-nums}
-  .clases{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:16px}
-  .clase{padding:14px 16px}
-  .clase h2{font-size:1.15rem;margin:0} .clase .meta{color:var(--suave);font-size:.88rem;margin:2px 0 10px}
-  .sem{display:inline-block;background:var(--azul);color:#fff;border-radius:8px;padding:.05em .5em;font-size:.8rem;font-weight:700;margin-right:6px}
-  .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
-  .chip{padding:8px;text-align:center;border:1px solid var(--linea);border-radius:10px;background:#fff} .chip b{display:block;font-size:1.5rem} .chip small{color:var(--suave);font-size:.75rem}
-  .chip.v b{color:var(--verde)} .chip.n b{color:var(--naranja)} .chip.g b{color:#8a8374}
-  .fila{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--linea)}
-  .fila:last-child{border-bottom:0} .fila .n{font-weight:600} .fila time{color:var(--suave);margin-right:10px;font-variant-numeric:tabular-nums}
-  .lista{max-height:46vh;overflow:auto}
-  .nuevo{animation:aparece 1.2s ease} @keyframes aparece{from{background:#fff3c4}to{background:transparent}}
-  .vacio{color:var(--suave);padding:20px 0;text-align:center}
-  .pie2{margin-top:16px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-  @media(max-width:560px){.reloj{font-size:2rem}}
+  /* Pantalla del aula: fondo oscuro, letras grandes, se lee de lejos */
+  body{background:radial-gradient(900px 500px at 100% 0%,rgba(247,132,31,.16),transparent 60%),radial-gradient(800px 600px at 0% 100%,rgba(33,76,136,.45),transparent 60%),var(--marino-950);color:#fff}
+  .cima{display:flex;align-items:center;gap:16px;padding:22px 32px 6px;flex-wrap:wrap}
+  .cima .marca{display:flex;gap:14px;align-items:center;min-width:0}
+  .cima .marca b{font-family:var(--titulo);font-weight:600;font-size:1.1rem;display:block}
+  .cima .marca small{color:var(--marino-300);font-size:.8rem}
+  .cima .der{margin-left:auto;display:flex;gap:10px;align-items:center}
+  .pildora{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.12)}
+  main{max-width:1300px;margin:0 auto;padding:18px 32px 10px}
+  .heroe{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;flex-wrap:wrap;margin-bottom:24px}
+  .heroe h1{font-size:2.6rem;margin:6px 0 0}
+  .reloj{font-family:var(--titulo);font-size:5rem;font-weight:600;line-height:.9;font-variant-numeric:tabular-nums;text-align:right;
+         background:linear-gradient(180deg,#fff,var(--marino-200));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .fecha{color:var(--naranja-400);font-weight:600;text-transform:capitalize;text-align:right;margin-top:8px;letter-spacing:.02em}
+  .clases{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:20px}
+  .clase{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:24px;padding:22px;backdrop-filter:blur(6px);display:flex;flex-direction:column}
+  .clase h2{font-size:1.35rem;margin:10px 0 4px}
+  .sem{display:inline-block;background:var(--naranja-500);color:#fff;border-radius:999px;padding:.2em .8em;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .meta{color:var(--marino-300);font-size:.88rem;display:flex;gap:6px 16px;flex-wrap:wrap}
+  .meta b{color:var(--naranja-400)}
+  .anillo-fila{display:flex;align-items:center;gap:20px;margin:18px 0}
+  .anillo{--p:0;width:110px;height:110px;border-radius:50%;flex:none;display:grid;place-items:center;background:conic-gradient(var(--naranja-500) calc(var(--p)*1%),rgba(255,255,255,.1) 0)}
+  .anillo span{width:88px;height:88px;border-radius:50%;background:var(--marino-950);display:grid;place-items:center;text-align:center;line-height:1}
+  .anillo b{font-family:var(--titulo);font-size:1.6rem;font-weight:600;display:block} .anillo small{color:var(--marino-300);font-size:.68rem}
+  .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;flex:1}
+  .chip{padding:10px;border-radius:16px;background:rgba(255,255,255,.06);text-align:center}
+  .chip b{display:block;font-family:var(--titulo);font-size:1.7rem;font-weight:600;line-height:1.1} .chip small{color:var(--marino-300);font-size:.72rem}
+  .chip.v b{color:#4ade80} .chip.n b{color:#fbbf24} .chip.g b{color:var(--marino-200)}
+  .lista{max-height:42vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
+  .fila{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.04)}
+  .fila .n{font-weight:600;display:flex;align-items:center;gap:12px;min-width:0}
+  .inicial{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:.78rem;font-weight:700;background:rgba(255,255,255,.1)}
+  .fila .der{display:flex;align-items:center;gap:10px;flex:none}
+  .fila time{color:var(--marino-300);font-variant-numeric:tabular-nums;font-size:.88rem}
+  .st{background:rgba(255,255,255,.1);color:#fff}
+  .st-puntual{background:rgba(34,197,94,.18);color:#86efac} .st-atraso{background:rgba(251,191,36,.18);color:#fcd34d} .st-justificado{background:rgba(96,165,250,.2);color:#93c5fd}
+  .nuevo{animation:aparece 2.4s ease} @keyframes aparece{from{background:rgba(247,132,31,.45)}to{background:rgba(255,255,255,.04)}}
+  .vacio{color:var(--marino-300)} .vacio .icono{color:rgba(255,255,255,.2)}
+  .pie2{margin-top:24px;padding:18px 22px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;border-radius:24px;
+        background:linear-gradient(110deg,var(--naranja-500),var(--naranja-700))}
+  .pie2 .txt{display:flex;gap:14px;align-items:center}
+  .pie2 .ic{width:48px;height:48px;border-radius:14px;background:rgba(255,255,255,.18);display:grid;place-items:center;flex:none} .pie2 .ic svg{width:26px;height:26px}
+  .pie2 b{font-family:var(--titulo);font-weight:600;font-size:1.1rem} .pie2 small{display:block;opacity:.85}
+  .pie2 .acc{display:flex;gap:10px;flex-wrap:wrap}
+  .pie2 button{background:#fff;color:var(--naranja-700)} .pie2 button:hover{background:var(--naranja-50);color:var(--naranja-700)}
+  .pie2 button.sec{background:transparent;color:#fff;border-color:rgba(255,255,255,.6)} .pie2 button.sec:hover{background:rgba(255,255,255,.12)}
+  .pie{color:rgba(203,215,234,.45)} .pie b{color:rgba(203,215,234,.7)}
+  @media(max-width:600px){.cima,main{padding-left:16px;padding-right:16px}.reloj{font-size:3.2rem;text-align:left}.fecha{text-align:left}.heroe h1{font-size:1.9rem}
+    .clases{grid-template-columns:1fr}.anillo{width:90px;height:90px}.anillo span{width:72px;height:72px}}
 </style></head>
 <body>
-<div class="barra"><div class="marca">{{INSTITUCION}}<small>Control de asistencia con reconocimiento facial</small></div>
-  <div style="margin-left:auto"><span class="pildora"><span class="punto" id="pt"></span><span id="cam">Cámara…</span></span></div></div>
+<div class="cima">
+  <div class="marca"><div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
+    <span><b>{{INSTITUCION}}</b><small>Control de asistencia con reconocimiento facial</small></span></div>
+  <div class="der"><span class="pildora"><span class="punto" id="pt"></span><span id="cam">Cámara…</span></span></div>
+</div>
 <main>
-  <div class="cab">
-    <div><h1>Clases en curso</h1><p class="sub">Gestión <span id="gestion">{{GESTION}}</span> · <span id="fecha"></span></p></div>
-    <div class="reloj" id="reloj">--:--</div>
+  <div class="heroe">
+    <div><div class="eyebrow">Gestión <span id="gestion">{{GESTION}}</span></div><h1>Clases en curso</h1></div>
+    <div><div class="reloj" id="reloj">--:--</div><div class="fecha" id="fecha"></div></div>
   </div>
-  <div class="clases" id="clases"><div class="tarjeta clase vacio">Cargando…</div></div>
-  <div class="tarjeta pie2"><span>📷 Para marcar: <b>mira a la cámara</b> al llegar. Se registra en la materia de tu semestre que tiene clase ahora.</span>
-    <span style="display:flex;gap:8px;flex-wrap:wrap"><a href="/marcar" id="lnkMarcar" hidden><button class="naranja">📷 Marcar con selfie</button></a><a href="/mi-asistencia"><button>Consultar mi asistencia</button></a></span></div>
+  <div class="clases" id="clases"><div class="clase vacio">Cargando…</div></div>
+  <div class="pie2">
+    <div class="txt"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
+      <div><b>Al llegar, mira a la cámara</b><small>Se registra en la materia de tu semestre que tiene clase ahora.</small></div></div>
+    <div class="acc"><a href="/marcar" id="lnkMarcar" hidden><button>📷 Marcar con selfie</button></a><a href="/mi-asistencia"><button class="sec">Consultar mi asistencia</button></a></div>
+  </div>
 </main>
-<div class="pie">Control de asistencia · funciona sin internet</div>
+<div class="pie"><b>Control de asistencia</b> · funciona sin internet</div>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ESTADO = {puntual:'Puntual', atraso:'Atraso', justificado:'Justificado'};
+const INICIALES = n => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
+const VACIO = t => `<div class="vacio"><svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-3.9 3.1-7 7-7s7 3.1 7 7M17 3.5a4 4 0 0 1 0 9M22 21c0-3-1.8-5.6-4.5-6.6"/></svg>${t}</div>`;
 let vistos = new Set(), primera = true;
-function reloj(){ document.getElementById('reloj').textContent = new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'}); }
+function reloj(){ document.getElementById('reloj').textContent = new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit',hour12:false}); }
 function tarjeta(c){
-  const m = c.clase.materia, r = c.resumen;
+  const m = c.clase.materia, r = c.resumen, pct = r.total ? Math.round(r.presentes * 100 / r.total) : 0;
   let lista;
-  if (c.llegaron === null) lista = '<div class="vacio">La lista de nombres no es pública.</div>';
-  else if (!c.llegaron.length) lista = '<div class="vacio">Todavía nadie marcó en esta clase.</div>';
+  if (c.llegaron === null) lista = VACIO('La lista de nombres no es pública.');
+  else if (!c.llegaron.length) lista = VACIO('Todavía nadie marcó en esta clase.');
   else lista = c.llegaron.map(x => {
     const k = m.id + x.nombre + x.hora, nuevo = !primera && !vistos.has(k); vistos.add(k);
-    return `<div class="fila ${nuevo ? 'nuevo' : ''}"><span class="n">${esc(x.nombre)}</span><span><time>${x.hora}${x.salida ? ' → ' + x.salida : ''}</time><span class="st st-${x.estado}">${ESTADO[x.estado] || x.estado}</span></span></div>`;
+    return `<div class="fila ${nuevo ? 'nuevo' : ''}"><span class="n"><span class="inicial">${esc(INICIALES(x.nombre))}</span>${esc(x.nombre)}</span>
+      <span class="der"><time>${x.hora}${x.salida ? ' → ' + x.salida : ''}</time><span class="st st-${x.estado}">${ESTADO[x.estado] || x.estado}</span></span></div>`;
   }).join('');
-  return `<div class="tarjeta clase">
-    <h2><span class="sem">${esc(m.semestre_texto)}</span>${esc(m.titulo)}</h2>
-    <div class="meta">${esc(m.docente || 'Sin docente')} · ${c.clase.inicio}–${c.clase.fin} · puntual hasta <b>${c.clase.limite}</b></div>
-    <div class="chips"><div class="chip"><b>${r.presentes}/${r.total}</b><small>presentes</small></div>
-      <div class="chip v"><b>${r.puntuales}</b><small>puntuales</small></div><div class="chip n"><b>${r.atrasos}</b><small>atrasos</small></div>
-      <div class="chip g"><b>${r.faltan}</b><small>aún no llegan</small></div></div>
-    <div class="lista">${lista}</div></div>`;
+  return `<article class="clase">
+    <div><span class="sem">${esc(m.semestre_texto)} semestre</span></div>
+    <h2>${esc(m.titulo)}</h2>
+    <div class="meta"><span>${esc(m.docente || 'Sin docente')}</span><span>${c.clase.inicio}–${c.clase.fin}</span><span>Puntual hasta <b>${c.clase.limite}</b></span></div>
+    <div class="anillo-fila">
+      <div class="anillo" style="--p:${pct}"><span><span><b>${r.presentes}/${r.total}</b><small>presentes</small></span></span></div>
+      <div class="chips"><div class="chip v"><b>${r.puntuales}</b><small>puntuales</small></div><div class="chip n"><b>${r.atrasos}</b><small>atrasos</small></div>
+        <div class="chip g"><b>${r.faltan}</b><small>faltan</small></div></div>
+    </div>
+    <div class="lista">${lista}</div></article>`;
 }
 async function cargar(){
   try{
@@ -66,7 +110,7 @@ async function cargar(){
     document.getElementById('pt').className = 'punto ' + (d.camara.conectada ? 'on' : 'off');
     document.getElementById('cam').textContent = d.camara.conectada ? 'Cámara activa' : 'Cámara apagada';
     document.getElementById('clases').innerHTML = d.clases.length ? d.clases.map(tarjeta).join('')
-      : '<div class="tarjeta clase vacio">No hay clases en este momento.</div>';
+      : '<div class="clase">' + VACIO('No hay clases en este momento.') + '</div>';
     primera = false;
   }catch(e){ document.getElementById('cam').textContent = 'Sin conexión'; document.getElementById('pt').className = 'punto off'; }
 }

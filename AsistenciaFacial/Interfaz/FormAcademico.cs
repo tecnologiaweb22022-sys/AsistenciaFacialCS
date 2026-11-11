@@ -9,7 +9,7 @@ using AsistenciaFacial.Nucleo;
 namespace AsistenciaFacial.Interfaz
 {
     /// <summary>
-    /// Estructura académica (solo administrador): gestiones (I-2026, II-2026…), docentes con su PIN
+    /// Estructura académica (solo administrador): gestiones (I-2026, II-2026…), docentes con su usuario y contraseña
     /// y materias de cada semestre con su docente y horario semanal.
     /// </summary>
     internal sealed class FormAcademico : Form
@@ -22,30 +22,39 @@ namespace AsistenciaFacial.Interfaz
         {
             _db = db;
             Text = "Académico · gestiones, docentes y materias";
-            Size = new Size(1100, 640);
+            Size = new Size(1180, 720);
             StartPosition = FormStartPosition.CenterParent;
-            BackColor = Tema.Fondo;
-            Font = Tema.Normal;
+            var cabecera = Tema.Preparar(this, "Estructura académica", "Gestiones, docentes con su usuario y contraseña, y materias de cada semestre con su horario");
 
-            var tabs = new TabControl { Dock = DockStyle.Fill };
+            var tabs = new Pestanas { Dock = DockStyle.Fill };
             tabs.TabPages.Add(PaginaMaterias());
             tabs.TabPages.Add(PaginaDocentes());
             tabs.TabPages.Add(PaginaGestiones());
-            Controls.Add(tabs);
+            var tarjeta = new Tarjeta { Dock = DockStyle.Fill, Padding = new Padding(6, 4, 6, 6) };
+            tarjeta.Controls.Add(tabs);
+            var marco = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16), BackColor = Tema.Fondo };
+            marco.Controls.Add(tarjeta);
+            Controls.Add(marco);
+            cabecera.SendToBack();
             Load += (s, e) => { CargarGestiones(); CargarDocentes(); };
         }
 
         static TabPage Pagina(string titulo, DataGridView grid, Control arriba, string ayuda)
         {
-            var p = new TabPage(titulo) { BackColor = Tema.Papel, Padding = new Padding(6) };
+            var p = new TabPage(titulo) { BackColor = Tema.Papel, Padding = new Padding(10, 6, 10, 8) };
             Tema.EstiloGrilla(grid);
             p.Controls.Add(grid);
-            p.Controls.Add(new Label { Dock = DockStyle.Bottom, Height = 44, ForeColor = Tema.Suave, Padding = new Padding(6, 4, 6, 0), Text = ayuda });
+            p.Controls.Add(new Label
+            {
+                Dock = DockStyle.Bottom, Height = 54, ForeColor = Tema.MarinoMedio, BackColor = Tema.MarinoBruma, Font = Tema.Chica,
+                Padding = new Padding(10, 8, 10, 0), Text = "ℹ  " + ayuda.Replace("\n", "\n     "),
+            });
+            p.Controls.Add(new Panel { Dock = DockStyle.Bottom, Height = 8, BackColor = Color.Transparent });
             p.Controls.Add(arriba);
             return p;
         }
 
-        static FlowLayoutPanel Barra() => new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(4, 4, 4, 4) };
+        static FlowLayoutPanel Barra() => Tema.Fila(DockStyle.Top, new Padding(0, 4, 0, 8));
 
         static T Elegido<T>(DataGridView g) where T : class => g.SelectedRows.Count > 0 ? g.SelectedRows[0].Tag as T : null;
 
@@ -55,11 +64,13 @@ namespace AsistenciaFacial.Interfaz
         TabPage PaginaMaterias()
         {
             var b = Barra();
-            b.Controls.Add(new Label { Text = "Gestión:", AutoSize = true, Margin = new Padding(3, 9, 0, 0) });
+            b.Controls.Add(Tema.Etiqueta("Gestión", Tema.Semi));
+            Tema.EstiloCampo(_gestionMaterias);
+            _gestionMaterias.Margin = new Padding(4, 5, 14, 3);
             b.Controls.Add(_gestionMaterias);
             _gestionMaterias.SelectedIndexChanged += (s, e) => CargarMaterias();
-            b.Controls.Add(Tema.Boton("+ Nueva materia", Tema.Verde, (s, e) => EditarMateria(new Materia { GestionId = (_gestionMaterias.SelectedItem as Gestion)?.Id ?? 0 })));
-            b.Controls.Add(Tema.Boton("Editar", Tema.Azul, (s, e) => { if (Elegido<Materia>(_gMaterias) is Materia m) EditarMateria(m); }));
+            b.Controls.Add(Tema.Boton("+ Nueva materia", Tema.Naranja, (s, e) => EditarMateria(new Materia { GestionId = (_gestionMaterias.SelectedItem as Gestion)?.Id ?? 0 })));
+            b.Controls.Add(Tema.Boton("Editar", Tema.Suave, (s, e) => { if (Elegido<Materia>(_gMaterias) is Materia m) EditarMateria(m); }));
             b.Controls.Add(Tema.Boton("Eliminar", Tema.Rojo, (s, e) => EliminarMateria()));
             foreach (var (n, t, w) in new[] { ("sem", "Semestre", 80), ("sigla", "Sigla", 90), ("nombre", "Materia", 0), ("docente", "Docente", 200),
                          ("horario", "Horario", 300), ("tol", "Tolerancia", 80) })
@@ -68,6 +79,9 @@ namespace AsistenciaFacial.Interfaz
                 if (w > 0) _gMaterias.Columns[n].Width = w; else _gMaterias.Columns[n].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             }
             _gMaterias.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0 && Elegido<Materia>(_gMaterias) is Materia m) EditarMateria(m); };
+            _gMaterias.Columns["sem"].DefaultCellStyle.Font = Tema.Semi;
+            _gMaterias.Columns["nombre"].DefaultCellStyle.Font = Tema.Semi;
+            Tema.Pildoras(_gMaterias, "tol");
             return Pagina("Materias y horarios", _gMaterias, b,
                 "Cada materia pertenece a un semestre de la gestión. La cámara marca en la materia del semestre del estudiante que tenga clase en ese momento.\n" +
                 "Tolerancia: minutos después del inicio en que todavía es PUNTUAL. Un semestre no puede tener dos clases a la misma hora.");
@@ -82,7 +96,7 @@ namespace AsistenciaFacial.Interfaz
                 int i = _gMaterias.Rows.Add(Academico.Semestre(m.Semestre), m.Sigla, m.Nombre, m.Docente.Length > 0 ? m.Docente : "(sin docente)",
                     m.TextoHorario, $"{m.ToleranciaMin} min");
                 _gMaterias.Rows[i].Tag = m;
-                if (m.DocenteId == null) _gMaterias.Rows[i].Cells["docente"].Style.ForeColor = Tema.Rojo;
+                if (m.DocenteId == null) _gMaterias.Rows[i].Cells["docente"].Style.ForeColor = Tema.Ambar;
             }
         }
 
@@ -90,7 +104,7 @@ namespace AsistenciaFacial.Interfaz
         {
             if (m.GestionId == 0) { MessageBox.Show("Primero crea una gestión (pestaña «Gestiones»).", Text); return; }
             using var f = new FormEditarMateria(m, _db.Gestiones(), _db.Docentes());
-            while (f.ShowDialog(this) == DialogResult.OK)
+            while (f.ShowDialog(Tema.Dueno(this)) == DialogResult.OK)
             {
                 try { _db.GuardarMateria(f.Resultado); CargarMaterias(); CargarDocentes(); return; }
                 catch (ErrorValidacion ex) { Error(ex); }
@@ -112,19 +126,21 @@ namespace AsistenciaFacial.Interfaz
         TabPage PaginaDocentes()
         {
             var b = Barra();
-            b.Controls.Add(Tema.Boton("+ Nuevo docente", Tema.Verde, (s, e) => EditarDocente(new Docente())));
-            b.Controls.Add(Tema.Boton("Editar / cambiar PIN", Tema.Azul, (s, e) => { if (Elegido<Docente>(_gDocentes) is Docente d) EditarDocente(d); }));
+            b.Controls.Add(Tema.Boton("+ Nuevo docente", Tema.Naranja, (s, e) => EditarDocente(new Docente())));
+            b.Controls.Add(Tema.Boton("Editar / cambiar contraseña", Tema.Suave, (s, e) => { if (Elegido<Docente>(_gDocentes) is Docente d) EditarDocente(d); }));
             b.Controls.Add(Tema.Boton("Eliminar", Tema.Rojo, (s, e) => EliminarDocente()));
-            foreach (var (n, t, w) in new[] { ("apellidos", "Apellidos", 0), ("nombres", "Nombres", 0), ("materias", "Materias (gestión activa)", 180),
-                         ("pin", "PIN", 110), ("activo", "Activo", 70) })
+            foreach (var (n, t, w) in new[] { ("apellidos", "Apellidos", 0), ("nombres", "Nombres", 0), ("usuario", "Usuario", 170),
+                         ("materias", "Materias (gestión activa)", 180), ("pin", "Contraseña", 130), ("activo", "Activo", 70) })
             {
                 _gDocentes.Columns.Add(n, t);
                 if (w > 0) _gDocentes.Columns[n].Width = w; else _gDocentes.Columns[n].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             }
             _gDocentes.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0 && Elegido<Docente>(_gDocentes) is Docente d) EditarDocente(d); };
+            Tema.Pildoras(_gDocentes, "pin");
+            _gDocentes.Columns["apellidos"].DefaultCellStyle.Font = Tema.Semi;
             return Pagina("Docentes", _gDocentes, b,
-                "Cada docente entra al programa y al panel web con su PIN y ve solo sus materias.\n" +
-                "El administrador (PIN de «Configuración») gestiona todo.");
+                "Cada docente entra al programa y al panel web con su usuario y contraseña, y ve solo sus materias.\n" +
+                "El administrador (usuario y contraseña en «Configuración») gestiona todo. Las contraseñas se guardan cifradas.");
         }
 
         void CargarDocentes()
@@ -132,7 +148,7 @@ namespace AsistenciaFacial.Interfaz
             _gDocentes.Rows.Clear();
             foreach (var d in _db.Docentes())
             {
-                int i = _gDocentes.Rows.Add(d.Apellidos, d.Nombres, d.Materias, d.TienePin ? "configurado" : "falta", d.Activo ? "sí" : "no");
+                int i = _gDocentes.Rows.Add(d.Apellidos, d.Nombres, d.Usuario, d.Materias, d.TienePin ? "configurada" : "falta", d.Activo ? "sí" : "no");
                 _gDocentes.Rows[i].Tag = d;
                 if (!d.Activo) _gDocentes.Rows[i].DefaultCellStyle.ForeColor = Tema.Suave;
             }
@@ -141,9 +157,9 @@ namespace AsistenciaFacial.Interfaz
         void EditarDocente(Docente d)
         {
             using var f = new FormEditarDocente(d);
-            while (f.ShowDialog(this) == DialogResult.OK)
+            while (f.ShowDialog(Tema.Dueno(this)) == DialogResult.OK)
             {
-                try { _db.GuardarDocente(f.Resultado, f.PinNuevo); CargarDocentes(); CargarMaterias(); return; }
+                try { _db.GuardarDocente(f.Resultado, f.ClaveNueva, f.ClaveRepetida); CargarDocentes(); CargarMaterias(); return; }
                 catch (ErrorValidacion ex) { Error(ex); }
             }
         }
@@ -162,10 +178,10 @@ namespace AsistenciaFacial.Interfaz
         TabPage PaginaGestiones()
         {
             var b = Barra();
-            b.Controls.Add(Tema.Boton("+ Nueva gestión", Tema.Verde, (s, e) => EditarGestion(new Gestion())));
-            b.Controls.Add(Tema.Boton("Editar", Tema.Azul, (s, e) => { if (Elegido<Gestion>(_gGestiones) is Gestion g) EditarGestion(g); }));
-            b.Controls.Add(Tema.Boton("★ Activar", Tema.Naranja, (s, e) => Activar()));
-            b.Controls.Add(Tema.Boton("Copiar materias / promover estudiantes…", Tema.Celeste, (s, e) => Copiar()));
+            b.Controls.Add(Tema.Boton("+ Nueva gestión", Tema.Naranja, (s, e) => EditarGestion(new Gestion())));
+            b.Controls.Add(Tema.Boton("Editar", Tema.Suave, (s, e) => { if (Elegido<Gestion>(_gGestiones) is Gestion g) EditarGestion(g); }));
+            b.Controls.Add(Tema.Boton("★ Activar", Tema.MarinoMedio, (s, e) => Activar()));
+            b.Controls.Add(Tema.Boton("Copiar materias / promover estudiantes…", Tema.Suave, (s, e) => Copiar()));
             b.Controls.Add(Tema.Boton("Eliminar", Tema.Rojo, (s, e) => EliminarGestion()));
             foreach (var (n, t, w) in new[] { ("nombre", "Gestión", 0), ("inicio", "Desde", 110), ("fin", "Hasta", 110), ("materias", "Materias", 90),
                          ("inscritos", "Inscritos", 90), ("activa", "Activa", 90) })
@@ -173,6 +189,7 @@ namespace AsistenciaFacial.Interfaz
                 _gGestiones.Columns.Add(n, t);
                 if (w > 0) _gGestiones.Columns[n].Width = w; else _gGestiones.Columns[n].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             }
+            Tema.Pildoras(_gGestiones, "activa");
             return Pagina("Gestiones", _gGestiones, b,
                 "Solo una gestión está ACTIVA: en ella marca la cámara y en ella se inscriben los estudiantes. Las demás quedan como historial.\n" +
                 "Al empezar una gestión nueva: créala, copia las materias de la misma gestión del año pasado, promueve a los estudiantes y actívala.");
@@ -200,7 +217,7 @@ namespace AsistenciaFacial.Interfaz
         void EditarGestion(Gestion g)
         {
             using var f = new FormEditarGestion(g);
-            while (f.ShowDialog(this) == DialogResult.OK)
+            while (f.ShowDialog(Tema.Dueno(this)) == DialogResult.OK)
             {
                 try { _db.GuardarGestion(f.Resultado); CargarGestiones(); return; }
                 catch (ErrorValidacion ex) { Error(ex); }
@@ -221,7 +238,7 @@ namespace AsistenciaFacial.Interfaz
         {
             if (!(Elegido<Gestion>(_gGestiones) is Gestion destino)) { MessageBox.Show("Selecciona la gestión de destino (la nueva).", Text); return; }
             using var f = new FormCopiarGestion(destino, _db.Gestiones().Where(x => x.Id != destino.Id).ToList());
-            if (f.ShowDialog(this) != DialogResult.OK) return;
+            if (f.ShowDialog(Tema.Dueno(this)) != DialogResult.OK) return;
             try
             {
                 string res = "";
@@ -246,7 +263,7 @@ namespace AsistenciaFacial.Interfaz
     // ───────────────────────── diálogos de edición ─────────────────────────
     internal abstract class Dialogo : Form
     {
-        protected int Y = 16;
+        protected int Y = 68 + 20;          // debajo de la cabecera
 
         protected Dialogo(string titulo, int ancho)
         {
@@ -254,29 +271,30 @@ namespace AsistenciaFacial.Interfaz
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            Font = Tema.Normal;
-            BackColor = Tema.Papel;
             ClientSize = new Size(ancho, 200);
+            Tema.Preparar(this, titulo, null, Tema.Papel);
         }
 
         protected void Fila(string texto, Control c, int ancho = 270, string ayuda = null)
         {
-            Controls.Add(new Label { Text = texto, Left = 16, Top = Y + 3, Width = 130 });
-            c.SetBounds(150, Y, ancho, 24);
+            Controls.Add(new Label { Text = texto, Left = 22, Top = Y + 5, Width = 128, ForeColor = Tema.Tinta });
+            if (!(c is DateTimePicker)) Tema.EstiloCampo(c); else c.Font = Tema.Campo;
+            c.SetBounds(154, Y, ancho, 28);
             Controls.Add(c);
-            if (ayuda != null) Controls.Add(new Label { Text = ayuda, Left = 156 + ancho, Top = Y + 3, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
-            Y += 38;
+            if (ayuda != null) Controls.Add(new Label { Text = ayuda, Left = 162 + ancho, Top = Y + 6, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
+            Y += 40;
         }
 
         protected void Botones()
         {
-            var ok = new Button { Text = "Guardar", DialogResult = DialogResult.OK, Width = 90, Top = Y + 6, Left = ClientSize.Width - 200 };
-            var no = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Width = 90, Top = Y + 6, Left = ClientSize.Width - 104 };
-            Controls.Add(ok);
-            Controls.Add(no);
+            var ok = Tema.Boton("Guardar", Tema.Naranja, null);
+            ok.DialogResult = DialogResult.OK;
+            var no = Tema.Boton("Cancelar", Tema.Suave, null);
+            no.DialogResult = DialogResult.Cancel;
+            Tema.Pie(this, ok, no);
             AcceptButton = ok;
             CancelButton = no;
-            ClientSize = new Size(ClientSize.Width, Y + 48);
+            ClientSize = new Size(ClientSize.Width, Y + 12 + 60);
         }
     }
 
@@ -311,23 +329,36 @@ namespace AsistenciaFacial.Interfaz
 
     internal sealed class FormEditarDocente : Dialogo
     {
-        readonly TextBox _nombres = new TextBox(), _apellidos = new TextBox(), _pin = new TextBox { UseSystemPasswordChar = true };
+        readonly TextBox _nombres = new TextBox(), _apellidos = new TextBox(), _usuario = new TextBox { MaxLength = 30 },
+            _clave = new TextBox { UseSystemPasswordChar = true, MaxLength = 100 }, _repetir = new TextBox { UseSystemPasswordChar = true, MaxLength = 100 };
         readonly CheckBox _activo = new CheckBox { Text = "Activo (puede entrar al programa)", AutoSize = true };
         readonly Docente _d;
+        bool _usuarioEditado;
 
-        public Docente Resultado => new Docente { Id = _d.Id, Nombres = _nombres.Text, Apellidos = _apellidos.Text, Activo = _activo.Checked };
-        public string PinNuevo => _pin.Text;
+        public Docente Resultado => new Docente { Id = _d.Id, Nombres = _nombres.Text, Apellidos = _apellidos.Text, Usuario = _usuario.Text, Activo = _activo.Checked };
+        public string ClaveNueva => _clave.Text;
+        public string ClaveRepetida => _repetir.Text;
 
-        public FormEditarDocente(Docente d) : base(d.Id == 0 ? "Nuevo docente" : "Editar docente", 470)
+        public FormEditarDocente(Docente d) : base(d.Id == 0 ? "Nuevo docente" : "Editar docente", 560)
         {
             _d = d;
             _nombres.Text = d.Nombres;
             _apellidos.Text = d.Apellidos;
+            _usuario.Text = d.Usuario;
+            _usuarioEditado = d.Id > 0;
             _activo.Checked = d.Id == 0 || d.Activo;
-            Fila("Nombres *", _nombres);
-            Fila("Apellidos", _apellidos);
-            Fila(d.Id == 0 ? "PIN *" : "PIN nuevo", _pin, 120, d.Id == 0 ? "mínimo 4 caracteres" : "vacío = no cambiar");
-            _activo.Location = new Point(150, Y);
+            // al crear, el usuario se sugiere solo a partir del nombre (se puede cambiar)
+            void Sugerir(object s, EventArgs e) { if (!_usuarioEditado) _usuario.Text = Claves.Sugerir(_nombres.Text, _apellidos.Text); }
+            _nombres.TextChanged += Sugerir;
+            _apellidos.TextChanged += Sugerir;
+            _usuario.KeyPress += (s, e) => _usuarioEditado = true;
+            Fila("Nombres *", _nombres, 360);
+            Fila("Apellidos", _apellidos, 360);
+            Fila("Usuario *", _usuario, 200, "para entrar, ej. maria.quispe");
+            Fila(d.Id == 0 ? "Contraseña *" : "Nueva contraseña", _clave, 200, d.Id == 0 ? $"mínimo {Claves.LargoMinimo} caracteres" : "vacío = no cambiar");
+            Fila("Repetir contraseña", _repetir, 200);
+            _activo.Location = new Point(154, Y + 2);
+            _activo.ForeColor = Tema.Suave;
             Controls.Add(_activo);
             Y += 30;
             Botones();
@@ -394,10 +425,24 @@ namespace AsistenciaFacial.Interfaz
             Fila("Docente", _docente, 300);
             Fila("Tolerancia (min)", _tolerancia, 70, "después del inicio todavía es PUNTUAL");
 
-            Controls.Add(new Label { Text = "Horario semanal (una fila por día; horas HH:mm)", Left = 16, Top = Y, AutoSize = true, Font = Tema.Negrita, ForeColor = Tema.Azul });
-            Y += 26;
-            _horario.SetBounds(16, Y, 524, 190);
+            Y += 4;
+            Controls.Add(new Label { Text = "HORARIO SEMANAL  ·  una fila por día, horas HH:mm", Left = 22, Top = Y, AutoSize = true, Font = Tema.SemiChica, ForeColor = Tema.NaranjaOscuro });
+            Y += 24;
+            _horario.SetBounds(22, Y, 516, 190);
             _horario.BackgroundColor = Color.White;
+            _horario.BorderStyle = BorderStyle.FixedSingle;
+            _horario.EnableHeadersVisualStyles = false;
+            _horario.ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.None;
+            _horario.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            _horario.ColumnHeadersHeight = 34;
+            _horario.ColumnHeadersDefaultCellStyle.BackColor = Tema.Marino;
+            _horario.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
+            _horario.ColumnHeadersDefaultCellStyle.Font = Tema.SemiChica;
+            _horario.ColumnHeadersDefaultCellStyle.SelectionBackColor = Tema.Marino;
+            _horario.DefaultCellStyle.SelectionBackColor = Tema.NaranjaClaro;
+            _horario.DefaultCellStyle.SelectionForeColor = Tema.Tinta;
+            _horario.GridColor = Tema.Linea;
+            _horario.RowTemplate.Height = 30;
             _horario.RowHeadersWidth = 28;
             _horario.AllowUserToAddRows = true;
             _horario.AllowUserToDeleteRows = true;
@@ -405,11 +450,12 @@ namespace AsistenciaFacial.Interfaz
             _horario.Columns.Add("inicio", "Inicio");
             _horario.Columns.Add("fin", "Fin");
             _horario.Columns["inicio"].Width = _horario.Columns["fin"].Width = 140;
+            _horario.Columns["dia"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             foreach (var b in m.Horarios) _horario.Rows.Add(Academico.Dia(b.Dia), b.Inicio, b.Fin);
             _horario.DataError += (s, e) => e.ThrowException = false;
             Controls.Add(_horario);
             Y += 196;
-            Controls.Add(new Label { Text = "Escribe en la última fila para agregar un día. Selecciona una fila y pulsa Supr para quitarla.", Left = 16, Top = Y, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
+            Controls.Add(new Label { Text = "Escribe en la última fila para agregar un día. Selecciona una fila y pulsa Supr para quitarla.", Left = 22, Top = Y, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
             Y += 22;
             Botones();
         }
@@ -439,19 +485,21 @@ namespace AsistenciaFacial.Interfaz
             }
             Controls.Add(new Label
             {
-                Text = $"Llena la gestión {destino.Nombre} con datos de otra gestión. Lo que ya exista no se duplica.", Left = 16, Top = Y,
+                Text = $"Llena la gestión {destino.Nombre} con datos de otra gestión. Lo que ya exista no se duplica.", Left = 22, Top = Y,
                 AutoSize = true, ForeColor = Tema.Suave,
             });
             Y += 32;
-            _chkMaterias.Location = new Point(16, Y); Controls.Add(_chkMaterias);
-            _materias.SetBounds(360, Y - 2, 140, 24); Controls.Add(_materias);
+            _chkMaterias.Location = new Point(22, Y); _chkMaterias.ForeColor = Tema.Tinta; Controls.Add(_chkMaterias);
+            Tema.EstiloCampo(_materias);
+            _materias.SetBounds(360, Y - 3, 140, 28); Controls.Add(_materias);
             Y += 26;
-            Controls.Add(new Label { Text = "ej. para I-2027 copia las de I-2026 (1ro, 3ro y 5to)", Left = 36, Top = Y, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
+            Controls.Add(new Label { Text = "ej. para I-2027 copia las de I-2026 (1ro, 3ro y 5to)", Left = 42, Top = Y, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
             Y += 32;
-            _chkPromover.Location = new Point(16, Y); Controls.Add(_chkPromover);
-            _promover.SetBounds(360, Y - 2, 140, 24); Controls.Add(_promover);
+            _chkPromover.Location = new Point(22, Y); _chkPromover.ForeColor = Tema.Tinta; Controls.Add(_chkPromover);
+            Tema.EstiloCampo(_promover);
+            _promover.SetBounds(360, Y - 3, 140, 28); Controls.Add(_promover);
             Y += 26;
-            Controls.Add(new Label { Text = "ej. de II-2026: 2do → 3ro, 4to → 5to; los de 6to egresan", Left = 36, Top = Y, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
+            Controls.Add(new Label { Text = "ej. de II-2026: 2do → 3ro, 4to → 5to; los de 6to egresan", Left = 42, Top = Y, AutoSize = true, ForeColor = Tema.Suave, Font = Tema.Chica });
             Y += 30;
             _chkMaterias.Checked = _chkPromover.Checked = otras.Count > 0;
             Botones();

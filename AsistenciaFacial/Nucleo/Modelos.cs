@@ -38,7 +38,8 @@ namespace AsistenciaFacial.Nucleo
         public string Nombres { get; set; } = "";
         public string Apellidos { get; set; } = "";
         public bool Activo { get; set; } = true;
-        public bool TienePin { get; set; }
+        public string Usuario { get; set; } = "";           // para entrar: usuario + contraseña
+        public bool TienePin { get; set; }                  // tiene contraseña asignada
         public int Materias { get; set; }               // materias a su cargo en la gestión activa
         public string NombreCompleto => $"{Nombres} {Apellidos}".Trim();
         public override string ToString() => NombreCompleto;

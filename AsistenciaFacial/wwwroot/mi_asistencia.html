@@ -1,60 +1,83 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a1d3d">
 <title>Mi asistencia · {{INSTITUCION}}</title>
 <link rel="stylesheet" href="/static/estilo.css">
 <style>
-  main{max-width:640px;margin:0 auto;padding:16px 14px 40px}
-  .buscar{padding:16px;display:flex;gap:8px} .buscar input{font-size:1.1rem}
-  h1{font-size:1.3rem;margin:12px 0 4px} .sub{color:var(--suave);margin:0 0 12px}
-  h2{font-size:1rem;margin:18px 0 8px}
-  .mat{padding:12px 14px;margin-bottom:10px}
-  .mat .tit{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
-  .mat .tit b{font-size:1rem} .mat .tit span{font-size:1.5rem;font-weight:800}
-  .mat small{color:var(--suave)}
-  .barra2{height:10px;border-radius:99px;background:var(--linea);overflow:hidden;margin:8px 0 6px} .barra2 i{display:block;height:100%}
-  .nums{display:flex;gap:12px;flex-wrap:wrap;font-size:.85rem;color:var(--suave)} .nums b{color:var(--tinta)}
-  .dias{padding:4px 14px} .dia{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--linea)}
-  .dia:last-child{border:0} .dia small{color:var(--suave)}
-  .error{color:var(--rojo);font-weight:600;padding:10px 0}
-  .aviso{padding:12px;background:#fff7df;border-left:5px solid var(--amarillo);margin-bottom:12px;border-radius:10px}
+  body{background:linear-gradient(180deg,var(--marino-900) 0,var(--marino-800) 250px,var(--fondo) 250px)}
+  .cima{display:flex;align-items:center;gap:12px;padding:16px 20px;color:#fff;max-width:700px;margin:0 auto;width:100%}
+  .cima b{font-family:var(--titulo);font-weight:600;display:block;font-size:.98rem;line-height:1.2}
+  .cima small{color:var(--marino-300);font-size:.76rem}
+  .cima a{margin-left:auto;color:#fff;font-size:.82rem;font-weight:600;text-decoration:none;padding:.45em .9em;border-radius:999px;background:rgba(255,255,255,.1)}
+  main{max-width:700px;margin:0 auto;padding:6px 16px 30px;width:100%}
+  .heroe{color:#fff;padding:8px 4px 20px} .heroe .eyebrow{color:var(--naranja-400)} .heroe h1{margin:6px 0 0;font-size:2rem}
+  .buscar{padding:8px;display:flex;gap:8px;box-shadow:var(--sombra-2);border-radius:999px}
+  .buscar input{font-size:1.1rem;border:0;background:transparent;border-radius:999px;padding-left:1.2em} .buscar input:focus{box-shadow:none;background:transparent}
+  .perfil{margin:22px 0 6px;padding:20px;display:flex;align-items:center;gap:16px;background:linear-gradient(120deg,var(--naranja-500),var(--naranja-700));color:#fff;border-radius:var(--radio);box-shadow:var(--sombra-1)}
+  .avatar{width:62px;height:62px;border-radius:50%;background:rgba(255,255,255,.22);color:#fff;display:grid;place-items:center;font-family:var(--titulo);font-weight:600;font-size:1.4rem;flex:none}
+  .perfil h1{font-size:1.4rem;margin:0} .perfil .sub{margin:3px 0 0;font-size:.88rem;opacity:.9}
+  h2{font-family:var(--texto);font-size:.74rem;margin:26px 4px 10px;color:var(--suave);text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+  .mat{padding:18px 20px;margin-bottom:12px}
+  .mat .tit{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+  .mat .tit b{font-family:var(--titulo);font-weight:600;font-size:1.08rem;color:var(--marino-900)} .mat small{color:var(--suave)}
+  .mat .pct{font-family:var(--titulo);font-weight:600;font-size:1.8rem;line-height:1}
+  .barra-p{display:flex;height:12px;border-radius:99px;overflow:hidden;background:var(--marino-100);margin:12px 0 10px}
+  .barra-p i{display:block;height:100%}
+  .leyenda{display:flex;gap:6px 16px;flex-wrap:wrap;font-size:.8rem;color:var(--suave)}
+  .leyenda span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:var(--c)}
+  .leyenda b{color:var(--tinta)}
+  .extra{margin-top:8px;font-size:.8rem;color:var(--ambar-texto)}
+  .dias{padding:6px 10px}
+  .dia{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 10px;border-radius:14px}
+  .dia + .dia{border-top:1px solid var(--linea)} .dia .f{font-weight:600;text-transform:capitalize} .dia small{color:var(--suave)}
 </style></head>
 <body>
-<div class="barra"><div class="marca">Mi asistencia<small>{{INSTITUCION}} · Gestión {{GESTION}}</small></div>
-  <div style="margin-left:auto"><a href="/" style="color:#fff;opacity:.7;font-size:.85rem">Clases en curso</a></div></div>
+<div class="cima">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
+  <span><b>{{INSTITUCION}}</b><small>Gestión {{GESTION}}</small></span>
+  <a href="/">Clases en curso</a>
+</div>
 <main>
+  <div class="heroe"><div class="eyebrow">Mi asistencia</div><h1>Consulta tu resumen</h1></div>
   <form class="tarjeta buscar" onsubmit="buscar(event)">
-    <input id="codigo" placeholder="Tu código o CI" autocomplete="off" inputmode="numeric" required>
-    <button>Ver</button>
+    <input id="codigo" placeholder="Tu código o CI" autocomplete="off" inputmode="numeric" required aria-label="Tu código o CI">
+    <button class="naranja">Ver</button>
   </form>
   <div id="res"></div>
 </main>
-<div class="pie">Control de asistencia · funciona sin internet</div>
+<div class="pie"><b>Control de asistencia</b> · funciona sin internet</div>
 <script>
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ESTADO = {puntual:'Puntual', atraso:'Atraso', justificado:'Justificado', falta:'Falta'};
-const color = p => p >= 80 ? 'var(--verde)' : p >= 60 ? 'var(--naranja)' : 'var(--rojo)';
+const color = p => p >= 80 ? 'var(--verde)' : p >= 60 ? 'var(--ambar)' : 'var(--rojo)';
+const INICIALES = n => String(n || '').split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0]).join('').toUpperCase();
 async function buscar(ev){
   if (ev) ev.preventDefault();
   const cod = document.getElementById('codigo').value.trim(); if (!cod) return;
   try { localStorage.setItem('codigo', cod); } catch(e) {}
   const R = document.getElementById('res');
-  const r = await fetch('/api/estudiante/' + encodeURIComponent(cod)); const d = await r.json();
-  if (!r.ok) { R.innerHTML = `<div class="error">${esc(d.error)}</div>`; return; }
+  let r, d;
+  try { r = await fetch('/api/estudiante/' + encodeURIComponent(cod)); d = await r.json(); }
+  catch (e) { R.innerHTML = '<div class="error" style="margin-top:16px">Sin conexión. ¿Estás en el WiFi del aula?</div>'; return; }
+  if (!r.ok) { R.innerHTML = `<div class="error" style="margin-top:16px">${esc(d.error)}</div>`; return; }
   const e = d.estudiante;
-  let html = `<h1>${esc(e.nombre)}</h1><p class="sub">Código ${esc(e.codigo)}${e.curso ? ' · ' + esc(e.curso) : ''}` +
-    (e.semestre ? ` · <b>${esc(e.semestre_texto)} semestre</b> (gestión ${esc(d.gestion)})` : '') + '</p>';
-  if (!e.rostro_registrado) html += '<div class="aviso">⚠️ Tu rostro todavía no está registrado: pide que lo registren.</div>';
-  if (!e.semestre) html += `<div class="aviso">No estás inscrito en ningún semestre de la gestión ${esc(d.gestion)}. Avisa en dirección.</div>`;
-  if (d.materias.length) html += '<h2>Mis materias</h2>' + d.materias.map(m => `<div class="tarjeta mat">
-      <div class="tit"><b>${esc(m.materia)}</b><span style="color:${color(m.porcentaje)}">${m.porcentaje}%</span></div>
-      <small>${esc(m.docente || 'Sin docente')} · ${m.dias} clase(s)</small>
-      <div class="barra2"><i style="width:${m.porcentaje}%;background:${color(m.porcentaje)}"></i></div>
-      <div class="nums"><span><b>${m.puntuales}</b> puntual</span><span><b>${m.atrasos}</b> atraso</span><span><b>${m.justificados}</b> justificado</span><span><b>${m.faltas}</b> falta</span>${m.sin_salida ? `<span><b>${m.sin_salida}</b> sin salida</span>` : ''}</div>
-    </div>`).join('');
+  let html = `<div class="perfil"><div class="avatar">${esc(INICIALES(e.nombre))}</div><div><h1>${esc(e.nombre)}</h1><p class="sub">Código ${esc(e.codigo)}${e.curso ? ' · ' + esc(e.curso) : ''}` +
+    (e.semestre ? ` · <b>${esc(e.semestre_texto)} semestre</b>` : '') + '</p></div></div>';
+  if (!e.rostro_registrado) html += '<div class="aviso">⚠️ <span>Tu rostro todavía no está registrado: pide que lo registren.</span></div>';
+  if (!e.semestre) html += `<div class="aviso">ℹ️ <span>No estás inscrito en ningún semestre de la gestión ${esc(d.gestion)}. Avisa en dirección.</span></div>`;
+  if (d.materias.length) html += '<h2>Mis materias</h2>' + d.materias.map(m => {
+      const tot = Math.max(1, m.puntuales + m.atrasos + m.justificados + m.faltas), w = n => (n * 100 / tot).toFixed(1) + '%';
+      return `<div class="tarjeta mat">
+      <div class="tit"><div><b>${esc(m.materia)}</b><br><small>${esc(m.docente || 'Sin docente')} · ${m.dias} clase(s)</small></div>
+        <span class="pct" style="color:${color(m.porcentaje)}">${m.porcentaje}%</span></div>
+      <div class="barra-p"><i style="width:${w(m.puntuales)};background:var(--verde)"></i><i style="width:${w(m.atrasos)};background:var(--ambar)"></i><i style="width:${w(m.justificados)};background:var(--celeste)"></i><i style="width:${w(m.faltas)};background:var(--rojo)"></i></div>
+      <div class="leyenda"><span style="--c:var(--verde)"><b>${m.puntuales}</b> puntual</span><span style="--c:var(--ambar)"><b>${m.atrasos}</b> atraso</span><span style="--c:var(--celeste)"><b>${m.justificados}</b> justificado</span><span style="--c:var(--rojo)"><b>${m.faltas}</b> falta</span></div>
+      ${m.sin_salida ? `<div class="extra">${m.sin_salida} día(s) sin marcar salida</div>` : ''}
+    </div>`; }).join('');
   html += '<h2>Últimas clases</h2><div class="tarjeta dias">' + (d.dias.length ? d.dias.map(x => `<div class="dia"><span>
-      ${new Date(x.fecha+'T12:00').toLocaleDateString('es-BO',{weekday:'short', day:'numeric', month:'short'})} · ${esc(x.materia)}
-      ${x.hora ? `<small>· ${x.hora}${x.salida ? ' – ' + x.salida : ' (sin salida)'}</small>` : ''}${x.observacion ? `<br><small>${esc(x.observacion)}</small>` : ''}</span>
-      <span class="st st-${x.estado}">${ESTADO[x.estado]}</span></div>`).join('') : '<p class="sub" style="padding:12px 0">Aún no hay clases registradas.</p>') + '</div>';
+      <span class="f">${new Date(x.fecha+'T12:00').toLocaleDateString('es-BO',{weekday:'short', day:'numeric', month:'short'})}</span> · ${esc(x.materia)}
+      ${x.hora ? `<br><small>${x.hora}${x.salida ? ' – ' + x.salida : ' (sin salida)'}</small>` : ''}${x.observacion ? `<br><small>${esc(x.observacion)}</small>` : ''}</span>
+      <span class="st st-${x.estado}">${ESTADO[x.estado]}</span></div>`).join('') : '<p class="vacio">Aún no hay clases registradas.</p>') + '</div>';
   R.innerHTML = html;
 }
 try { const c = localStorage.getItem('codigo'); if (c) { document.getElementById('codigo').value = c; buscar(); } } catch(e) {}

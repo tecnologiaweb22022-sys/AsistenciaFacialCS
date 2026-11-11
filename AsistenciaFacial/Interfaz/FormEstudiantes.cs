@@ -19,6 +19,7 @@ namespace AsistenciaFacial.Interfaz
         readonly ComboBox _semestre = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 130, Margin = new Padding(3, 6, 3, 3) };
         readonly Label _info = new Label();
         readonly string _gestion;
+        readonly Cabecera _cabecera;
 
         public FormEstudiantes(Configuracion cfg, BaseDatos db, MotorAsistencia motor)
         {
@@ -27,37 +28,42 @@ namespace AsistenciaFacial.Interfaz
             _motor = motor;
             _gestion = db.GestionActiva()?.Nombre ?? "";
             Text = "Estudiantes y registro de rostros";
-            Size = new Size(1100, 680);
+            Size = new Size(1180, 720);
             StartPosition = FormStartPosition.CenterParent;
-            BackColor = Tema.Fondo;
-            Font = Tema.Normal;
+            _cabecera = Tema.Preparar(this, "Estudiantes y registro de rostros", $"Gestión {_gestion}");
 
-            var arriba = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Padding = new Padding(8, 8, 8, 4) };
-            arriba.Controls.Add(Tema.Boton("+ Nuevo", Tema.Verde, (s, e) =>
+            var arriba = Tema.Fila(DockStyle.Top, new Padding(16, 12, 16, 4));
+            arriba.Controls.Add(Tema.Boton("+ Nuevo estudiante", Tema.Naranja, (s, e) =>
                 Editar(new Estudiante { Curso = _cfg.Curso, Semestre = _semestre.SelectedIndex is int i && i >= 1 && i <= 6 ? i : 0 })));
-            arriba.Controls.Add(Tema.Boton("Editar", Tema.Azul, (s, e) => { var x = Seleccionado(); if (x != null) Editar(x); }));
-            arriba.Controls.Add(Tema.Boton("Registrar rostro", Tema.Naranja, (s, e) => RegistrarRostro()));
+            arriba.Controls.Add(Tema.Boton("📷  Registrar rostro", Tema.MarinoMedio, (s, e) => RegistrarRostro()));
+            arriba.Controls.Add(Tema.Boton("Editar", Tema.Suave, (s, e) => { var x = Seleccionado(); if (x != null) Editar(x); }));
             arriba.Controls.Add(Tema.Boton("Borrar rostro", Tema.Suave, (s, e) => BorrarRostro()));
-            arriba.Controls.Add(Tema.Boton("Eliminar estudiante", Tema.Rojo, (s, e) => Eliminar()));
-            arriba.Controls.Add(Tema.Boton("Importar lista CSV…", Tema.Suave, (s, e) => Importar()));
+            arriba.Controls.Add(Tema.Boton("Eliminar", Tema.Rojo, (s, e) => Eliminar()));
+            arriba.Controls.Add(Tema.Boton("Importar CSV…", Tema.Suave, (s, e) => Importar()));
             arriba.Controls.Add(Tema.Boton("Exportar CSV…", Tema.Suave, (s, e) => Exportar()));
-            _buscar.Width = 170;
-            _buscar.Margin = new Padding(10, 6, 3, 3);
+            var filtros = Tema.Fila(DockStyle.Top, new Padding(16, 0, 16, 10));
+            _buscar.Width = 240;
+            _buscar.Margin = new Padding(4, 5, 14, 3);
+            Tema.EstiloCampo(_buscar);
+            _buscar.PlaceholderText = "Nombre, apellido o código…";
             _buscar.TextChanged += (s, e) => Cargar();
-            arriba.Controls.Add(new Label { Text = "Buscar:", AutoSize = true, Margin = new Padding(10, 9, 0, 0) });
-            arriba.Controls.Add(_buscar);
+            filtros.Controls.Add(Tema.Etiqueta("Buscar", Tema.Semi));
+            filtros.Controls.Add(_buscar);
             // índice 0 = todos, 1..6 = semestre, 7 = sin inscribir en la gestión activa
             _semestre.Items.Add("Todos");
             for (int i = 1; i <= 6; i++) _semestre.Items.Add(Academico.Semestre(i) + " semestre");
             _semestre.Items.Add("Sin inscribir");
             _semestre.SelectedIndex = 0;
             _semestre.SelectedIndexChanged += (s, e) => Cargar();
-            arriba.Controls.Add(new Label { Text = "Semestre:", AutoSize = true, Margin = new Padding(10, 9, 0, 0) });
-            arriba.Controls.Add(_semestre);
+            Tema.EstiloCampo(_semestre);
+            _semestre.Width = 160;
+            _semestre.Margin = new Padding(4, 5, 4, 3);
+            filtros.Controls.Add(Tema.Etiqueta("Semestre", Tema.Semi));
+            filtros.Controls.Add(_semestre);
 
             Tema.EstiloGrilla(_grid);
             _grid.RowTemplate.Height = 52;
-            _grid.Columns.Add(new DataGridViewImageColumn { Name = "foto", HeaderText = "", Width = 56, ImageLayout = DataGridViewImageCellLayout.Zoom });
+            _grid.Columns.Add(new DataGridViewImageColumn { Name = "foto", HeaderText = "", Width = 62, ImageLayout = DataGridViewImageCellLayout.Zoom });
             _grid.Columns["foto"].DefaultCellStyle.NullValue = null;       // sin foto: celda vacía (no la "X" roja)
             _grid.Columns.Add("codigo", "Código");
             _grid.Columns.Add("apellidos", "Apellidos");
@@ -69,21 +75,33 @@ namespace AsistenciaFacial.Interfaz
             _grid.Columns["codigo"].Width = 90;
             _grid.Columns["apellidos"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             _grid.Columns["nombres"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            _grid.Columns["semestre"].Width = 125;
             _grid.Columns["curso"].Width = 140;
-            _grid.Columns["rostro"].Width = 130;
-            _grid.Columns["activo"].Width = 60;
+            _grid.Columns["activo"].Width = 70;
+            _grid.Columns["codigo"].DefaultCellStyle.ForeColor = Tema.Suave;
+            _grid.Columns["apellidos"].DefaultCellStyle.Font = Tema.Semi;
+            _grid.Columns["rostro"].Width = 150;
+            _grid.Columns["semestre"].Width = 135;
+            Tema.FotosRedondas(_grid, "foto");
+            Tema.Pildoras(_grid, "rostro");
+            Tema.Pildoras(_grid, "semestre");
             _grid.CellDoubleClick += (s, e) => { if (e.RowIndex >= 0) RegistrarRostro(); };
 
             _info.Dock = DockStyle.Bottom;
-            _info.Height = 44;
+            _info.Height = 50;
             _info.ForeColor = Tema.Suave;
-            _info.Padding = new Padding(10, 4, 10, 0);
+            _info.BackColor = Color.Transparent;
+            _info.Padding = new Padding(4, 8, 4, 0);
             _info.Text = $"Doble clic = registrar rostro. CSV para importar: codigo;nombres;apellidos;curso;semestre (semestre 1 a 6: lo inscribe en {_gestion}).\n" +
                          "Al eliminar a un estudiante se borran también su rostro y sus asistencias (datos personales).";
-            Controls.Add(_grid);
-            Controls.Add(_info);
+            var tarjeta = new Tarjeta { Dock = DockStyle.Fill, Padding = new Padding(8, 8, 8, 4) };
+            tarjeta.Controls.Add(_grid);
+            tarjeta.Controls.Add(_info);
+            var marco = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16, 0, 16, 16), BackColor = Tema.Fondo };
+            marco.Controls.Add(tarjeta);
+            Controls.Add(marco);
+            Controls.Add(filtros);
             Controls.Add(arriba);
+            _cabecera.SendToBack();
             Load += (s, e) => Cargar();
         }
 
@@ -104,23 +122,22 @@ namespace AsistenciaFacial.Interfaz
                                                            && (sem == 0 || (sem == 7 ? x.Semestre == 0 : x.Semestre == sem))))
             {
                 int i = _grid.Rows.Add(e.Muestras > 0 ? Tema.ImagenDeBytes(_db.Foto(e.Id)) : null, e.Codigo, e.Apellidos, e.Nombres,
-                    e.Semestre > 0 ? Academico.Semestre(e.Semestre) : "sin inscribir", e.Curso,
-                    e.Muestras > 0 ? $"Sí ({e.Muestras} muestras)" : "falta registrar", e.Activo ? "sí" : "no");
+                    e.Semestre > 0 ? Academico.Semestre(e.Semestre) + " semestre" : "sin inscribir", e.Curso,
+                    e.Muestras > 0 ? $"Sí · {e.Muestras} muestras" : "falta registrar", e.Activo ? "sí" : "no");
                 var fila = _grid.Rows[i];
                 fila.Tag = e;
-                fila.Cells["rostro"].Style.ForeColor = e.Muestras > 0 ? Tema.Verde : Tema.Rojo;
-                if (e.Semestre == 0) fila.Cells["semestre"].Style.ForeColor = Tema.Rojo;
                 if (!e.Activo) fila.DefaultCellStyle.ForeColor = Tema.Suave;
                 if (sel == e.Id) fila.Selected = true;
             }
             int total = _db.Estudiantes().Count, conRostro = _db.Estudiantes().Count(x => x.Muestras > 0);
             Text = $"Estudiantes y registro de rostros — {total} estudiantes, {conRostro} con rostro registrado";
+            _cabecera.Subtitulo = $"Gestión {_gestion}  ·  {total} estudiantes  ·  {conRostro} con rostro registrado  ·  {total - conRostro} pendientes";
         }
 
         void Editar(Estudiante e)
         {
             using var f = new FormEditarEstudiante(e, _gestion);
-            while (f.ShowDialog(this) == DialogResult.OK)
+            while (f.ShowDialog(Tema.Dueno(this)) == DialogResult.OK)
             {
                 try
                 {
@@ -146,7 +163,7 @@ namespace AsistenciaFacial.Interfaz
             if (e.Muestras > 0 && MessageBox.Show($"{e.NombreCompleto} ya tiene su rostro registrado. ¿Reemplazarlo?", Text, MessageBoxButtons.YesNo) != DialogResult.Yes)
                 return;
             using var f = new FormRegistroRostro(_motor, e, _cfg.Reconocimiento.MuestrasRegistro);
-            f.ShowDialog(this);
+            f.ShowDialog(Tema.Dueno(this));
             Cargar();
         }
 
@@ -172,7 +189,7 @@ namespace AsistenciaFacial.Interfaz
         void Importar()
         {
             using var d = new OpenFileDialog { Filter = "Lista CSV o texto (*.csv;*.txt)|*.csv;*.txt|Todos|*.*" };
-            if (d.ShowDialog(this) != DialogResult.OK) return;
+            if (d.ShowDialog(Tema.Dueno(this)) != DialogResult.OK) return;
             var (nuevos, act, errores) = _db.ImportarCsv(File.ReadAllText(d.FileName, Encoding.UTF8));
             Cargar();
             MessageBox.Show($"Nuevos: {nuevos}\nActualizados: {act}" + (errores.Count > 0 ? "\n\nNo se importaron:\n" + string.Join("\n", errores.Take(15)) : ""),
@@ -182,7 +199,7 @@ namespace AsistenciaFacial.Interfaz
         void Exportar()
         {
             using var d = new SaveFileDialog { FileName = "estudiantes.csv", Filter = "CSV (*.csv)|*.csv" };
-            if (d.ShowDialog(this) != DialogResult.OK) return;
+            if (d.ShowDialog(Tema.Dueno(this)) != DialogResult.OK) return;
             File.WriteAllText(d.FileName, _db.ExportarCsv("estudiantes", Array.Empty<long>(), BaseDatos.Hoy(), BaseDatos.Hoy()), new UTF8Encoding(false));
         }
 
@@ -214,9 +231,8 @@ namespace AsistenciaFacial.Interfaz
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(420, 330);
-            Font = Tema.Normal;
-            BackColor = Tema.Papel;
+            ClientSize = new Size(520, 400);
+            Tema.Preparar(this, Text, e.Id == 0 ? "Datos del nuevo estudiante" : $"{e.NombreCompleto} · {e.Codigo}", Tema.Papel);
             _codigo.Text = e.Codigo;
             _nombres.Text = e.Nombres;
             _apellidos.Text = e.Apellidos;
@@ -224,21 +240,25 @@ namespace AsistenciaFacial.Interfaz
             _activo.Checked = e.Activo;
             for (int i = 0; i <= 6; i++) _semestre.Items.Add(Academico.Semestre(i));      // índice = semestre (0 = sin inscribir)
             _semestre.SelectedIndex = Math.Max(0, Math.Min(6, e.Semestre));
-            int y = 16;
+            int y = 88;
             foreach (var (txt, caja) in new (string, Control)[] { ("Código o CI *", _codigo), ("Nombres *", _nombres), ("Apellidos", _apellidos),
                          ("Carrera / curso", _curso), ($"Semestre {gestion}", _semestre) })
             {
-                Controls.Add(new Label { Text = txt, Left = 16, Top = y + 3, Width = 112 });
-                caja.SetBounds(130, y, 270, 24);
+                Controls.Add(new Label { Text = txt, Left = 22, Top = y + 5, Width = 120, ForeColor = Tema.Tinta });
+                Tema.EstiloCampo(caja);
+                caja.SetBounds(146, y, 350, 28);
                 Controls.Add(caja);
                 y += 40;
             }
-            _activo.Location = new Point(130, y);
+            _activo.Location = new Point(146, y + 2);
+            _activo.ForeColor = Tema.Suave;
             Controls.Add(_activo);
-            var ok = new Button { Text = "Guardar", DialogResult = DialogResult.OK, Left = 220, Top = y + 44, Width = 85 };
-            var no = new Button { Text = "Cancelar", DialogResult = DialogResult.Cancel, Left = 315, Top = y + 44, Width = 85 };
-            Controls.Add(ok);
-            Controls.Add(no);
+            var ok = Tema.Boton("Guardar", Tema.Naranja, null);
+            ok.DialogResult = DialogResult.OK;
+            var no = Tema.Boton("Cancelar", Tema.Suave, null);
+            no.DialogResult = DialogResult.Cancel;
+            Tema.Pie(this, ok, no);
+            ClientSize = new Size(520, y + 36 + 60);
             AcceptButton = ok;
             CancelButton = no;
         }

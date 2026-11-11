@@ -16,10 +16,10 @@ namespace AsistenciaFacial.Interfaz
         readonly MotorAsistencia _motor;
         readonly Estudiante _est;
         readonly PictureBox _vivo = new PictureBox();
-        readonly ProgressBar _barra = new ProgressBar();
+        readonly BarraProgreso _barra = new BarraProgreso();
         readonly FlowLayoutPanel _muestras = new FlowLayoutPanel();
         readonly Label _estado = new Label(), _aviso = new Label();
-        readonly Button _btnIniciar;
+        readonly BotonModerno _btnIniciar;
         int _enCamino;
         bool _terminado;
 
@@ -28,49 +28,62 @@ namespace AsistenciaFacial.Interfaz
             _motor = motor;
             _est = est;
             Text = $"Registrar rostro — {est.NombreCompleto} ({est.Codigo})";
-            Size = new Size(980, 680);
+            Size = new Size(1040, 720);
             StartPosition = FormStartPosition.CenterParent;
-            BackColor = Tema.Fondo;
-            Font = Tema.Normal;
+            var cabecera = Tema.Preparar(this, $"Registrar rostro · {est.NombreCompleto}", $"Código {est.Codigo}  ·  se toman {total} muestras con la cámara");
 
-            var instrucciones = new Label
+            // ── panel derecho: pasos, progreso y muestras ──
+            var derecha = new Panel { Dock = DockStyle.Right, Width = 340, Padding = new Padding(0, 16, 16, 16), BackColor = Tema.Fondo };
+            var tarjeta = new Tarjeta { Dock = DockStyle.Fill, Padding = new Padding(16) };
+            var pasos = new Label
             {
-                Dock = DockStyle.Top, Height = 74, Padding = new Padding(12, 8, 12, 0), Font = Tema.Normal, ForeColor = Tema.Tinta,
-                Text = $"1. Que {est.Nombres} se siente frente a la cámara, con buena luz y SOLO (una persona).\n" +
-                       "2. Presiona «Comenzar» y pídele que gire un poco la cabeza: izquierda, derecha, arriba, abajo.\n" +
-                       $"3. Se toman {total} muestras y se guardan automáticamente. Sin lentes oscuros, gorra ni barbijo.",
+                Dock = DockStyle.Top, Height = 196, ForeColor = Tema.Tinta, BackColor = Color.Transparent, Font = Tema.Normal,
+                Text = $"1.  Que {est.Nombres} se siente frente a la cámara, con buena luz y SOLO (una persona).\n\n" +
+                       "2.  Presiona «Comenzar» y pídele que gire un poco la cabeza: izquierda, derecha, arriba, abajo.\n\n" +
+                       "3.  Las muestras se guardan solas. Sin lentes oscuros, gorra ni barbijo.",
             };
-            var derecha = new Panel { Dock = DockStyle.Right, Width = 300, Padding = new Padding(8) };
+            var tituloPasos = new Label { Dock = DockStyle.Top, Height = 30, Text = "CÓMO REGISTRAR", Font = Tema.SemiChica, ForeColor = Tema.NaranjaOscuro, BackColor = Color.Transparent };
             _estado.Dock = DockStyle.Top;
-            _estado.Height = 30;
+            _estado.Height = 40;
             _estado.Font = Tema.Titulo;
+            _estado.ForeColor = Tema.Marino;
+            _estado.BackColor = Color.Transparent;
+            _estado.TextAlign = ContentAlignment.BottomLeft;
             _estado.Text = $"0 / {total} muestras";
             _barra.Dock = DockStyle.Top;
-            _barra.Height = 18;
-            _barra.Maximum = total;
+            _barra.Height = 10;
+            _barra.Maximo = total;
+            var hueco = new Panel { Dock = DockStyle.Top, Height = 10, BackColor = Color.Transparent };
             _aviso.Dock = DockStyle.Top;
-            _aviso.Height = 64;
+            _aviso.Height = 58;
             _aviso.ForeColor = Tema.Rojo;
-            _aviso.Font = Tema.Negrita;
+            _aviso.BackColor = Color.Transparent;
+            _aviso.Font = Tema.Semi;
             _muestras.Dock = DockStyle.Fill;
             _muestras.AutoScroll = true;
-            derecha.Controls.Add(_muestras);
-            derecha.Controls.Add(_aviso);
-            derecha.Controls.Add(_barra);
-            derecha.Controls.Add(_estado);
+            _muestras.BackColor = Color.Transparent;
+            tarjeta.Controls.Add(_muestras);
+            tarjeta.Controls.Add(_aviso);
+            tarjeta.Controls.Add(hueco);
+            tarjeta.Controls.Add(_barra);
+            tarjeta.Controls.Add(_estado);
+            tarjeta.Controls.Add(pasos);
+            tarjeta.Controls.Add(tituloPasos);
+            derecha.Controls.Add(tarjeta);
 
-            var abajo = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 48, FlowDirection = FlowDirection.RightToLeft, Padding = new Padding(8, 6, 8, 0) };
-            abajo.Controls.Add(Tema.Boton("Cerrar", Tema.Suave, (s, e) => Close()));
-            _btnIniciar = Tema.Boton("▶ Comenzar", Tema.Verde, (s, e) => Comenzar());
-            abajo.Controls.Add(_btnIniciar);
+            _btnIniciar = Tema.Boton("▶  Comenzar", Tema.Naranja, (s, e) => Comenzar());
+            var pie = Tema.Pie(this, _btnIniciar, Tema.Boton("Cerrar", Tema.Suave, (s, e) => Close()));
 
+            var marco = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16), BackColor = Tema.Fondo };
             _vivo.Dock = DockStyle.Fill;
             _vivo.SizeMode = PictureBoxSizeMode.Zoom;
-            _vivo.BackColor = Color.FromArgb(18, 24, 38);
-            Controls.Add(_vivo);
+            _vivo.BackColor = Tema.Camara;
+            marco.Controls.Add(_vivo);
+            Controls.Add(marco);
             Controls.Add(derecha);
-            Controls.Add(abajo);
-            Controls.Add(instrucciones);
+            marco.BringToFront();
+            pie.SendToBack();
+            cabecera.SendToBack();
 
             _motor.FrameListo += Frame;
             _motor.RegistroProgreso += Progreso;
@@ -90,10 +103,11 @@ namespace AsistenciaFacial.Interfaz
         {
             foreach (Control c in _muestras.Controls) { (c as PictureBox)?.Image?.Dispose(); }
             _muestras.Controls.Clear();
-            _barra.Value = 0;
+            _barra.Valor = 0;
             _aviso.Text = "";
             _btnIniciar.Enabled = false;
             _btnIniciar.Text = "Capturando…";
+            _estado.ForeColor = Tema.Marino;
             _terminado = false;
             _motor.IniciarRegistro(_est);
         }
@@ -125,8 +139,8 @@ namespace AsistenciaFacial.Interfaz
         void Progreso(int n, int total, byte[] cara) => EnHilo(() =>
         {
             _estado.Text = $"{n} / {total} muestras";
-            _barra.Value = Math.Min(_barra.Maximum, n);
-            _muestras.Controls.Add(new PictureBox { Image = Tema.ImagenDeBytes(cara), Width = 84, Height = 84, SizeMode = PictureBoxSizeMode.Zoom, Margin = new Padding(3) });
+            _barra.Valor = n;
+            _muestras.Controls.Add(new PictureBox { Image = Tema.ImagenDeBytes(cara), Width = 88, Height = 88, SizeMode = PictureBoxSizeMode.Zoom, Margin = new Padding(3), BackColor = Tema.MarinoClaro });
         });
 
         void Aviso(string m) => EnHilo(() => _aviso.Text = m);
@@ -135,7 +149,8 @@ namespace AsistenciaFacial.Interfaz
         {
             _terminado = true;
             _btnIniciar.Enabled = true;
-            _btnIniciar.Text = "▶ Repetir";
+            _btnIniciar.Text = "▶  Repetir";
+            _estado.ForeColor = exito ? Tema.Verde : Tema.Rojo;
             MessageBox.Show(mensaje + (exito ? "\n\nDesde ahora la cámara lo reconocerá al llegar." : ""), Text,
                 MessageBoxButtons.OK, exito ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
             if (exito) { DialogResult = DialogResult.OK; Close(); }

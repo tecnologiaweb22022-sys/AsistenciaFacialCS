@@ -242,7 +242,7 @@ namespace AsistenciaFacial.Nucleo
         static Docente MapaDocente(SqlDataReader r) => new Docente
         {
             Id = L(r, "id"), Nombres = S(r, "nombres"), Apellidos = S(r, "apellidos"), Activo = L(r, "activo") == 1,
-            TienePin = S(r, "pin").Length > 0, Materias = (int)L(r, "materias"),
+            TienePin = S(r, "pin").Length > 0, Materias = (int)L(r, "materias"), Usuario = S(r, "usuario"),
         };
 
         static Materia MapaMateria(SqlDataReader r) => new Materia
@@ -326,7 +326,25 @@ namespace AsistenciaFacial.Nucleo
             Ddl(AgregarColumna("asistencias", "hora_salida", "FLOAT NULL"));
             Ddl(AgregarColumna("asistencias", "similitud_salida", "FLOAT NULL"));
             Ddl(AgregarColumna("asistencias", "fuente_salida", "NVARCHAR(20) NULL"));
+            // Ingreso con usuario y contraseña: a los docentes existentes se les crea un usuario a partir de su nombre.
+            Ddl(AgregarColumna("docentes", "usuario", "NVARCHAR(40) NULL"));
+            Operacion(s =>
+            {
+                var sinUsuario = s.Consultar("SELECT id, nombres, apellidos FROM docentes WHERE usuario IS NULL OR usuario = N''",
+                    r => (id: L(r, "id"), nombres: S(r, "nombres"), apellidos: S(r, "apellidos")));
+                foreach (var d in sinUsuario)
+                {
+                    string baseU = Claves.Sugerir(d.nombres, d.apellidos);
+                    if (baseU.Length < 3 || Reservado(baseU)) baseU = "docente" + d.id;
+                    string u = baseU;
+                    for (int i = 2; s.Numero("SELECT COUNT(*) FROM docentes WHERE usuario = @u", new { u }) > 0; i++) u = baseU + i;
+                    s.Ejecutar("UPDATE docentes SET usuario = @u WHERE id = @id", new { u, d.id });
+                }
+                return 0;
+            });
         }
+
+        static bool Reservado(string usuario) => usuario == "admin" || usuario == "administrador";
 
         void AMaterias(Configuracion legado)
         {
@@ -573,58 +591,51 @@ namespace AsistenciaFacial.Nucleo
         public List<Docente> Docentes(bool soloActivos = false) => Operacion(s =>
             s.Consultar(SqlDocentes + (soloActivos ? "WHERE d.activo = 1 " : "") + "ORDER BY d.apellidos, d.nombres", MapaDocente));
 
-        /// <summary>Crea o actualiza. «pinNuevo» vacío = no cambiar el PIN (obligatorio al crear).</summary>
-        public long GuardarDocente(Docente d, string pinNuevo)
+        /// <summary>
+        /// Crea o actualiza. «claveNueva» vacía = no cambiar la contraseña (obligatoria al crear).
+        /// «repetida» debe coincidir con la nueva.
+        /// </summary>
+        public long GuardarDocente(Docente d, string claveNueva, string repetida)
         {
-            string nombres = (d.Nombres ?? "").Trim(), apellidos = (d.Apellidos ?? "").Trim();
-            pinNuevo = (pinNuevo ?? "").Trim();
+            string nombres = (d.Nombres ?? "").Trim(), apellidos = (d.Apellidos ?? "").Trim(), usuario = Claves.NormalizarUsuario(d.Usuario);
+            claveNueva ??= "";
             if (nombres.Length == 0) throw new ErrorValidacion("Escribe el nombre del docente");
             if (nombres.Length > 60 || apellidos.Length > 60) throw new ErrorValidacion("Texto demasiado largo");
-            if (d.Id == 0 && pinNuevo.Length == 0) throw new ErrorValidacion("Asigna un PIN al docente (mínimo 4 caracteres)");
-            if (pinNuevo.Length > 0 && pinNuevo.Length < 4) throw new ErrorValidacion("El PIN debe tener al menos 4 caracteres");
+            Claves.ValidarUsuario(usuario);
+            if (Reservado(usuario)) throw new ErrorValidacion($"El usuario «{usuario}» está reservado para el administrador. Elige otro.");
+            if (d.Id == 0 && claveNueva.Length == 0) throw new ErrorValidacion($"Asigna una contraseña al docente (mínimo {Claves.LargoMinimo} caracteres)");
+            if (claveNueva.Length > 0) Claves.ValidarNueva(claveNueva, repetida);
             return Operacion(s =>
             {
-                var v = new { id = d.Id, nombres, apellidos, activo = d.Activo ? 1 : 0, pin = pinNuevo.Length > 0 ? HashPin(pinNuevo) : "", creado = Ahora() };
+                if (s.Numero("SELECT COUNT(*) FROM docentes WHERE usuario = @usuario AND id <> @id", new { usuario, id = d.Id }) > 0)
+                    throw new ErrorValidacion($"Ya existe otro docente con el usuario «{usuario}».");
+                var v = new { id = d.Id, nombres, apellidos, usuario, activo = d.Activo ? 1 : 0, pin = claveNueva.Length > 0 ? Claves.Hash(claveNueva) : "", creado = Ahora() };
                 if (d.Id > 0)
                 {
-                    s.Ejecutar("UPDATE docentes SET nombres = @nombres, apellidos = @apellidos, activo = @activo" +
-                               (pinNuevo.Length > 0 ? ", pin = @pin" : "") + " WHERE id = @id", v);
+                    s.Ejecutar("UPDATE docentes SET nombres = @nombres, apellidos = @apellidos, usuario = @usuario, activo = @activo" +
+                               (claveNueva.Length > 0 ? ", pin = @pin" : "") + " WHERE id = @id", v);
                     return d.Id;
                 }
-                return s.Insertar("INSERT INTO docentes (nombres, apellidos, pin, activo, creado) VALUES (@nombres, @apellidos, @pin, @activo, @creado)", v);
+                return s.Insertar("INSERT INTO docentes (nombres, apellidos, usuario, pin, activo, creado) VALUES (@nombres, @apellidos, @usuario, @pin, @activo, @creado)", v);
             });
         }
 
         /// <summary>Sus materias quedan «sin docente» (no se borran).</summary>
         public void EliminarDocente(long id) => Operacion(s => s.Ejecutar("DELETE FROM docentes WHERE id = @id", new { id }));
 
-        /// <summary>El docente con ese PIN, o null si no coincide o está inactivo.</summary>
-        public Docente ValidarDocente(long id, string pin) => Operacion(s =>
+        /// <summary>
+        /// El docente activo con ese usuario y contraseña, o null. Si el usuario no existe igual se calcula
+        /// un hash (señuelo), para que la respuesta tarde lo mismo y no revele qué usuarios existen.
+        /// </summary>
+        public Docente Autenticar(string usuario, string clave) => Operacion(s =>
         {
-            var fila = s.Consultar("SELECT pin FROM docentes WHERE id = @id AND activo = 1", r => S(r, "pin"), new { id }).FirstOrDefault();
-            if (fila == null || !PinValido(pin ?? "", fila)) return null;
-            return s.Consultar(SqlDocentes + "WHERE d.id = @id", MapaDocente, new { id }).FirstOrDefault();
+            string u = Claves.NormalizarUsuario(usuario);
+            var fila = s.Consultar("SELECT id, pin FROM docentes WHERE usuario = @u AND activo = 1", r => (id: L(r, "id"), pin: S(r, "pin")), new { u }).FirstOrDefault();
+            if (!Claves.Verificar(clave, fila.pin)) return null;
+            return s.Consultar(SqlDocentes + "WHERE d.id = @id", MapaDocente, new { fila.id }).FirstOrDefault();
         });
 
-        static string HashPin(string pin)
-        {
-            byte[] sal = RandomNumberGenerator.GetBytes(16);
-            byte[] h = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(pin), sal, 100_000, HashAlgorithmName.SHA256, 32);
-            return Convert.ToHexString(sal) + ":" + Convert.ToHexString(h);
-        }
-
-        static bool PinValido(string pin, string guardado)
-        {
-            var partes = guardado.Split(':');
-            if (partes.Length != 2) return false;
-            try
-            {
-                byte[] sal = Convert.FromHexString(partes[0]), esperado = Convert.FromHexString(partes[1]);
-                byte[] h = Rfc2898DeriveBytes.Pbkdf2(Encoding.UTF8.GetBytes(pin), sal, 100_000, HashAlgorithmName.SHA256, esperado.Length);
-                return CryptographicOperations.FixedTimeEquals(h, esperado);
-            }
-            catch (FormatException) { return false; }
-        }
+        static string HashPin(string pin) => Claves.Hash(pin);
 
         // ───────────────────────── materias y horarios ─────────────────────────
         static List<Materia> MateriasDe(Sesion s, string where, object p = null)

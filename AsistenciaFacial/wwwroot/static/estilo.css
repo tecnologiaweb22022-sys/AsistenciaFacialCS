@@ -1,39 +1,158 @@
-/* Estilo común — sin internet: solo fuentes del sistema */
+/* ════════════════════════════════════════════════════════════════════
+   Sistema visual «Aula» · Control de asistencia
+   Azul marino + naranja institucionales · barra lateral · formas de píldora
+   Sin internet: fuentes del sistema (Bahnschrift viene con Windows 10/11) e íconos SVG en línea.
+   ════════════════════════════════════════════════════════════════════ */
 :root{
-  --fondo:#f6f1e7; --papel:#fffdf8; --tinta:#14213d; --suave:#5b6478; --linea:#e3dccd;
-  --azul:#1d4e89; --celeste:#3a9bd5; --naranja:#f08a24; --verde:#2a9d5c; --amarillo:#f2b705;
-  --rojo:#d1495b; --sombra:0 1px 2px rgba(20,33,61,.08),0 4px 14px rgba(20,33,61,.06);
-  --radio:14px;
+  --marino-950:#06132a; --marino-900:#0a1d3d; --marino-800:#10294f; --marino-700:#173968; --marino-600:#214c88;
+  --marino-300:#9fb3d3; --marino-200:#cbd7ea; --marino-100:#e5ecf7; --marino-50:#f1f5fb;
+  --naranja-700:#bb5604; --naranja-600:#e36d0d; --naranja-500:#f7841f; --naranja-400:#ffa04d; --naranja-100:#ffecd9; --naranja-50:#fff6ee;
+
+  --fondo:#eaeff7; --papel:#ffffff; --tinta:#0c1b33; --suave:#57647c; --tenue:#8d98ac; --linea:#e3e9f2; --linea-fuerte:#cdd6e4;
+
+  --verde:#139a5b; --verde-fondo:#dcf5e8; --verde-texto:#0b6a3d;
+  --ambar:#d97706; --ambar-fondo:#ffefd6; --ambar-texto:#934b03;
+  --celeste:#2b7fc4; --celeste-fondo:#e0eefb; --celeste-texto:#185a92;
+  --rojo:#d63a51; --rojo-fondo:#fde4e8; --rojo-texto:#9a1d31;
+  --gris-fondo:#edf0f5; --gris-texto:#57647c;
+
+  /* alias usados por el código de las páginas */
+  --azul:var(--marino-700); --naranja:var(--naranja-500); --amarillo:#e8b007;
+
+  --titulo:"Bahnschrift","DIN Alternate","Barlow","Segoe UI Semibold",system-ui,sans-serif;
+  --texto:"Segoe UI Variable Text","Segoe UI",system-ui,-apple-system,Roboto,Ubuntu,sans-serif;
+  --sombra-1:0 1px 2px rgba(10,29,61,.05),0 4px 16px rgba(10,29,61,.06);
+  --sombra-2:0 6px 30px rgba(10,29,61,.12);
+  --sombra-3:0 20px 60px rgba(6,19,42,.35);
+  --radio:20px; --radio-s:14px;
+  --foco:0 0 0 4px rgba(247,132,31,.3);
+  --lateral:256px;
 }
+
 *{box-sizing:border-box}
 html,body{margin:0}
-body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;color:var(--tinta);
-  background:var(--fondo);
-  background-image:linear-gradient(rgba(58,155,213,.07) 1px,transparent 1px),
-                   linear-gradient(90deg,rgba(58,155,213,.07) 1px,transparent 1px);
-  background-size:24px 24px; line-height:1.4}
-a{color:var(--azul)}
-button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:.55em .9em;background:var(--azul);color:#fff;font-weight:600}
-button:hover{filter:brightness(1.08)} button:disabled{opacity:.45;cursor:default}
-button.sec{background:#fff;color:var(--tinta);border:1px solid var(--linea)}
-button.verde{background:var(--verde)} button.naranja{background:var(--naranja)} button.rojo{background:var(--rojo)}
+/* zoom general: +2 pt sobre la letra base (16 px → ~18,7 px); en celulares un poco menos para que todo quepa */
+html{font-size:116.7%;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+@media (max-width:560px){html{font-size:106%}}
+body{font-family:var(--texto);color:var(--tinta);background:var(--fondo);line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;display:flex;flex-direction:column}
+main{flex:1 0 auto;width:100%}
+h1,h2,h3,.titulo{font-family:var(--titulo);font-weight:600;letter-spacing:-.01em;line-height:1.15}
+a{color:var(--marino-600);text-underline-offset:3px} a:hover{color:var(--naranja-600)}
+small{font-size:.82em}
+.icono{width:1.15em;height:1.15em;flex:none;display:inline-block;vertical-align:-.2em}
+.num{font-variant-numeric:tabular-nums}
+
+/* ── botones: píldoras ─────────────────────────────────── */
+button,.btn{font:inherit;font-weight:600;font-size:.9rem;cursor:pointer;border:1.5px solid transparent;border-radius:999px;padding:.62em 1.25em;
+  background:var(--marino-800);color:#fff;display:inline-flex;align-items:center;justify-content:center;gap:.5em;text-decoration:none;line-height:1.15;
+  transition:background .15s,box-shadow .15s,transform .08s,border-color .15s,color .15s;white-space:nowrap}
+button:hover,.btn:hover{background:var(--marino-700);color:#fff}
+button:active,.btn:active{transform:scale(.97)}
+button:focus-visible,.btn:focus-visible{outline:0;box-shadow:var(--foco)}
+button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+button.naranja,.btn.naranja{background:linear-gradient(135deg,var(--naranja-400),var(--naranja-600));color:#fff;box-shadow:0 8px 20px rgba(247,132,31,.32)}
+button.naranja:hover{filter:brightness(1.05);background:linear-gradient(135deg,var(--naranja-400),var(--naranja-600))}
+button.verde{background:var(--verde)} button.verde:hover{background:#0f8048}
+button.rojo{background:var(--rojo)} button.rojo:hover{background:#b92d43}
 button.amarillo{background:var(--amarillo);color:var(--tinta)}
-input,select,textarea{font:inherit;padding:.5em .65em;border:1px solid var(--linea);border-radius:10px;background:#fff;color:var(--tinta);width:100%}
-.tarjeta{background:var(--papel);border:1px solid var(--linea);border-radius:var(--radio);box-shadow:var(--sombra)}
-.barra{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--tinta);color:#fff}
-.barra .marca{font-weight:800;letter-spacing:.3px}
-.barra .marca small{display:block;font-weight:500;opacity:.7;font-size:.75rem}
-.pildora{display:inline-flex;align-items:center;gap:6px;padding:.25em .7em;border-radius:99px;font-size:.82rem;font-weight:600;background:rgba(255,255,255,.12)}
-.punto{width:9px;height:9px;border-radius:50%;background:#999;display:inline-block}
-.punto.on{background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.25)} .punto.off{background:var(--rojo)}
-.pie{text-align:center;color:var(--suave);font-size:.8rem;padding:18px}
+button.sec,.btn.sec{background:transparent;color:var(--marino-800);border-color:var(--linea-fuerte)}
+button.sec:hover,.btn.sec:hover{background:var(--marino-50);border-color:var(--marino-300);color:var(--marino-900)}
+button.fantasma{background:transparent;color:var(--marino-700)} button.fantasma:hover{background:var(--marino-50);color:var(--marino-900)}
+a > button{pointer-events:none}
 
-/* colores por estado de mesa */
-.e-libre{--c:var(--verde)} .e-ocupada{--c:var(--azul)} .e-con_pedido{--c:var(--naranja)}
-.e-servida{--c:var(--celeste)} .e-llamando{--c:var(--amarillo)} .e-cuenta{--c:var(--amarillo)}
-@keyframes latido{0%,100%{box-shadow:0 0 0 0 rgba(242,183,5,.55)}50%{box-shadow:0 0 0 10px rgba(242,183,5,0)}}
-.e-llamando,.e-cuenta{animation:latido 1.4s infinite}
+/* ── campos ─────────────────────────────────────────────── */
+input,select,textarea{font:inherit;padding:.7em 1em;border:1.5px solid var(--linea);border-radius:var(--radio-s);background:var(--marino-50);color:var(--tinta);width:100%;
+  transition:border-color .15s,box-shadow .15s,background .15s}
+input::placeholder{color:var(--tenue)}
+input:hover,select:hover{border-color:var(--marino-200)}
+input:focus,select:focus,textarea:focus{outline:0;border-color:var(--naranja-500);background:#fff;box-shadow:var(--foco)}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--naranja-500);padding:0}
+label{color:var(--suave);font-size:.85rem;font-weight:600}
 
-/* estados de asistencia */
-.st{display:inline-block;padding:.15em .6em;border-radius:99px;font-size:.8rem;font-weight:700;color:#fff;background:#8a8374}
-.st-puntual{background:var(--verde)} .st-atraso{background:var(--naranja)} .st-justificado{background:var(--celeste)} .st-falta{background:#b8b0a0}
+/* ── superficies ─────────────────────────────────────────── */
+.tarjeta{background:var(--papel);border-radius:var(--radio);box-shadow:var(--sombra-1)}
+.logo{width:42px;height:42px;border-radius:13px;flex:none;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--naranja-400),var(--naranja-600));box-shadow:0 6px 16px rgba(247,132,31,.38)}
+.logo svg{width:24px;height:24px}
+
+/* barra superior simple (páginas sueltas y cartel QR) */
+.barra{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:12px 24px;background:rgba(255,255,255,.88);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--linea)}
+.barra .marca{display:flex;align-items:center;gap:12px;min-width:0}
+.barra .marca > span{min-width:0}
+.barra .marca b{display:block;font-family:var(--titulo);font-weight:600;font-size:1.02rem;color:var(--marino-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barra .marca small{display:block;color:var(--suave);font-size:.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barra .der{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.barra .enlace{color:var(--marino-700);font-weight:600;font-size:.88rem;text-decoration:none;padding:.5em .9em;border-radius:999px} .barra .enlace:hover{background:var(--marino-50)}
+
+/* indicadores */
+.pildora{display:inline-flex;align-items:center;gap:8px;padding:.42em .95em;border-radius:999px;font-size:.8rem;font-weight:600;background:var(--marino-50);color:var(--marino-800);white-space:nowrap}
+.punto{width:9px;height:9px;border-radius:50%;background:#9aa6ba;display:inline-block;flex:none}
+.punto.on{background:#22c55e;animation:pulso 2s infinite} .punto.off{background:#ef4444}
+@keyframes pulso{0%{box-shadow:0 0 0 0 rgba(34,197,94,.55)}70%{box-shadow:0 0 0 8px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+
+.pie{text-align:center;color:var(--tenue);font-size:.8rem;padding:22px 16px 26px} .pie b{color:var(--suave);font-weight:600}
+.eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--naranja-600)}
+
+/* ── estados de asistencia ───────────────────────────────── */
+.st{display:inline-flex;align-items:center;gap:6px;padding:.25em .75em;border-radius:999px;font-size:.76rem;font-weight:700;background:var(--gris-fondo);color:var(--gris-texto);white-space:nowrap}
+.st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.st-puntual{background:var(--verde-fondo);color:var(--verde-texto)} .st-atraso{background:var(--ambar-fondo);color:var(--ambar-texto)}
+.st-justificado{background:var(--celeste-fondo);color:var(--celeste-texto)} .st-falta{background:var(--gris-fondo);color:var(--gris-texto)}
+
+/* ── cifras del día: baldosas de color ───────────────────── */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.kpi{position:relative;overflow:hidden;padding:16px 18px;border-radius:var(--radio);color:#fff;background:linear-gradient(135deg,var(--marino-700),var(--marino-900));box-shadow:var(--sombra-1)}
+.kpi::after{content:"";position:absolute;right:-26px;top:-26px;width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.12)}
+.kpi small{display:block;font-weight:600;font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;opacity:.85}
+.kpi b{display:block;font-family:var(--titulo);font-size:2.1rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;margin-top:6px}
+.kpi.verde{background:linear-gradient(135deg,#1fb36c,#0f7d48)} .kpi.ambar{background:linear-gradient(135deg,#f2a024,#c96a04)}
+.kpi.celeste{background:linear-gradient(135deg,#3b95dc,#1d64a6)} .kpi.gris{background:linear-gradient(135deg,#8f9bb0,#5d6a82)}
+
+.progreso{height:8px;border-radius:99px;background:var(--marino-100);overflow:hidden}
+.progreso i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--naranja-400),var(--naranja-600));transition:width .5s ease}
+
+.aviso{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:var(--radio-s);background:var(--naranja-50);color:#7a3d06;margin-bottom:12px;font-size:.92rem;border:1px solid #ffdcbb}
+.error{color:var(--rojo-texto);background:var(--rojo-fondo);border-radius:var(--radio-s);padding:11px 16px;font-weight:600;margin-bottom:14px}
+.vacio{color:var(--suave);padding:30px 12px;text-align:center}
+.vacio .icono{width:40px;height:40px;color:var(--marino-200);display:block;margin:0 auto 8px}
+
+/* ── estructura con barra lateral (panel) ────────────────── */
+.app{display:grid;grid-template-columns:var(--lateral) 1fr;min-height:100vh}
+.lateral{position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:6px;padding:20px 14px;color:#fff;
+  background:radial-gradient(300px 200px at 0% 0%,rgba(247,132,31,.18),transparent 70%),linear-gradient(180deg,var(--marino-900),var(--marino-950))}
+.lateral .marca{display:flex;gap:12px;align-items:center;padding:4px 8px 18px}
+.lateral .marca b{font-family:var(--titulo);font-weight:600;font-size:1.05rem;display:block;line-height:1.1}
+.lateral .marca small{color:var(--marino-300);font-size:.74rem}
+.lateral .grupo{font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(203,215,234,.5);padding:14px 12px 6px}
+.lateral nav{display:flex;flex-direction:column;gap:4px}
+.lateral nav button,.lateral .item{justify-content:flex-start;width:100%;background:transparent;color:var(--marino-200);border-radius:var(--radio-s);padding:.75em 1em;font-weight:600;gap:12px;text-decoration:none}
+.lateral nav button svg,.lateral .item svg{width:20px;height:20px;flex:none}
+.lateral nav button:hover,.lateral .item:hover{background:rgba(255,255,255,.07);color:#fff}
+.lateral nav button.activo{background:linear-gradient(135deg,var(--naranja-500),var(--naranja-600));color:#fff;box-shadow:0 8px 20px rgba(247,132,31,.3)}
+.lateral .abajo{margin-top:auto;display:flex;flex-direction:column;gap:4px}
+.usuario{display:flex;gap:10px;align-items:center;padding:12px;border-radius:var(--radio-s);background:rgba(255,255,255,.06);margin-top:8px}
+.avatar{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:700;font-family:var(--titulo);background:var(--naranja-500);color:#fff;flex:none}
+.usuario b{display:block;font-size:.9rem;line-height:1.2} .usuario small{color:var(--marino-300)}
+.contenido{min-width:0;display:flex;flex-direction:column}
+.superior{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 28px;background:rgba(234,239,247,.85);backdrop-filter:blur(12px)}
+.superior h1{margin:0;font-size:1.6rem;color:var(--marino-900)}
+.superior p{margin:2px 0 0;color:var(--suave);font-size:.88rem}
+.superior .der{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.superior .pildora{background:#fff;box-shadow:var(--sombra-1)}
+
+*{scrollbar-width:thin;scrollbar-color:var(--linea-fuerte) transparent}
+::-webkit-scrollbar{width:10px;height:10px} ::-webkit-scrollbar-thumb{background:var(--linea-fuerte);border-radius:99px;border:3px solid transparent;background-clip:content-box}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  /* en el celular la barra lateral se vuelve barra de pestañas inferior */
+  .lateral{position:fixed;inset:auto 0 0 0;top:auto;height:auto;z-index:40;flex-direction:row;padding:6px 8px calc(6px + env(safe-area-inset-bottom));background:var(--marino-950)}
+  .lateral .marca,.lateral .grupo,.lateral .abajo{display:none}
+  .lateral nav{flex-direction:row;width:100%;justify-content:space-around}
+  .lateral nav button{flex-direction:column;gap:3px;font-size:.66rem;padding:.5em .3em;width:auto;flex:1;border-radius:12px}
+  .contenido{padding-bottom:84px}
+  .superior{padding:12px 16px}
+  .superior h1{font-size:1.3rem}
+}
+@media (max-width:560px){.barra{padding:10px 16px}.logo{width:38px;height:38px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

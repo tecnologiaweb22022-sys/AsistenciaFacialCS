@@ -47,7 +47,7 @@ namespace AsistenciaFacial.Nucleo
             using var gen = new QRCodeGenerator();
             using var datos = gen.CreateQrCode(texto, QRCodeGenerator.ECCLevel.M);
             using var svg = new SvgQRCode(datos);
-            return svg.GetGraphic(pixelesPorModulo, "#14213d", "#ffffff");
+            return svg.GetGraphic(pixelesPorModulo, "#0b1f3f", "#ffffff");
         }
 
         public static byte[] Png(string texto, int pixelesPorModulo)

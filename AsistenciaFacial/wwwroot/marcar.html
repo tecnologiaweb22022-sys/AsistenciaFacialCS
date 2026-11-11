@@ -1,46 +1,74 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0a1d3d">
 <title>Marcar asistencia · {{INSTITUCION}}</title>
 <link rel="stylesheet" href="/static/estilo.css">
 <style>
-  main{max-width:520px;margin:0 auto;padding:18px 16px 40px}
-  h1{font-size:1.5rem;margin:6px 0 2px} .sub{color:var(--suave);margin:0 0 16px}
-  .caja{padding:18px} label{font-weight:700;display:block;margin:0 0 6px}
-  #codigo{font-size:1.4rem;text-align:center;letter-spacing:.08em;margin-bottom:14px}
-  .boton{width:100%;padding:1em;font-size:1.15rem;border-radius:14px}
-  .vista{display:none;margin:14px auto 0;width:180px;height:180px;border-radius:50%;object-fit:cover;border:5px solid var(--linea)}
-  .estado{display:none;margin-top:14px;padding:16px;border-radius:14px;text-align:center;font-weight:600}
-  .estado.ok{background:#e3f4ea;color:#1c6b40} .estado.atraso{background:#fdebd5;color:#8a4b08}
-  .estado.error{background:#fbe3e6;color:#8f2433} .estado.espera{background:#e6eef8;color:var(--azul)}
-  .estado b{display:block;font-size:1.35rem;margin-bottom:4px}
-  .consejos{margin-top:16px;padding:14px;font-size:.9rem;color:var(--suave)} .consejos li{margin:3px 0}
-  .reloj{font-size:2.2rem;font-weight:800;color:var(--azul);text-align:center;font-variant-numeric:tabular-nums}
+  body{background:linear-gradient(180deg,var(--marino-900) 0,var(--marino-800) 330px,var(--fondo) 330px)}
+  .cima{display:flex;align-items:center;gap:12px;padding:16px 20px;color:#fff;max-width:520px;margin:0 auto;width:100%}
+  .cima b{font-family:var(--titulo);font-weight:600;display:block;font-size:.98rem;line-height:1.2}
+  .cima small{color:var(--marino-300);font-size:.76rem}
+  .cima a{margin-left:auto;color:#fff;font-size:.82rem;font-weight:600;text-decoration:none;padding:.45em .9em;border-radius:999px;background:rgba(255,255,255,.1)}
+  main{max-width:520px;margin:0 auto;padding:6px 16px 30px;width:100%}
+  .heroe{color:#fff;text-align:center;padding:10px 0 22px}
+  .heroe .eyebrow{color:var(--naranja-400)}
+  .reloj{font-family:var(--titulo);font-size:3.6rem;font-weight:600;font-variant-numeric:tabular-nums;line-height:1;margin:8px 0 4px}
+  .heroe p{margin:0;color:var(--marino-200);font-size:.9rem}
+  .caja{padding:24px 22px 26px;box-shadow:var(--sombra-2);text-align:center}
+  label{display:block;margin:0 0 8px;text-align:left}
+  #codigo{font-family:var(--titulo);font-size:1.5rem;text-align:center;letter-spacing:.1em;margin-bottom:6px;font-weight:600}
+  .disparador{position:relative;width:176px;height:176px;margin:22px auto 6px;border-radius:50%;padding:0;flex-direction:column;gap:8px;font-size:.95rem;
+              background:linear-gradient(145deg,var(--naranja-400),var(--naranja-700));box-shadow:0 18px 40px rgba(247,132,31,.45),inset 0 -6px 0 rgba(0,0,0,.12)}
+  .disparador::before{content:"";position:absolute;inset:-12px;border-radius:50%;border:3px dashed rgba(247,132,31,.45);animation:gira 18s linear infinite}
+  .disparador svg{width:56px;height:56px}
+  .disparador:hover{filter:brightness(1.05)}
+  .disparador:disabled::before{animation:none}
+  .ayuda{color:var(--tenue);font-size:.84rem;margin:12px 0 0}
+  .vista{display:none;margin:22px auto 0;width:150px;height:150px;border-radius:50%;object-fit:cover;border:5px solid #fff;box-shadow:0 0 0 3px var(--naranja-500),var(--sombra-2)}
+  .estado{display:none;margin-top:20px;padding:20px;border-radius:18px;text-align:center}
+  .estado.ok{background:var(--verde-fondo);color:var(--verde-texto)} .estado.atraso{background:var(--ambar-fondo);color:var(--ambar-texto)}
+  .estado.error{background:var(--rojo-fondo);color:var(--rojo-texto)} .estado.espera{background:var(--marino-50);color:var(--marino-700)}
+  .estado.espera b::after{content:"";display:inline-block;width:14px;height:14px;margin-left:8px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:gira .8s linear infinite;vertical-align:-2px}
+  @keyframes gira{to{transform:rotate(360deg)}}
+  .estado b{display:block;font-family:var(--titulo);font-weight:600;font-size:1.4rem;margin-bottom:4px} .estado small{opacity:.75}
+  .consejos{margin-top:16px;padding:20px 22px}
+  .consejos h3{margin:0 0 12px;font-size:1.05rem;color:var(--marino-900)}
+  .pasos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .pasos div{background:var(--marino-50);border-radius:16px;padding:12px 8px;text-align:center;font-size:.78rem;color:var(--suave)}
+  .pasos i{font-style:normal;font-size:1.5rem;display:block;margin-bottom:4px}
+  .consejos a{font-weight:600;text-decoration:none}
 </style></head>
 <body>
-<div class="barra"><div class="marca">{{INSTITUCION}}<small>Marcar asistencia con una selfie</small></div></div>
+<div class="cima">
+  <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
+  <span><b>{{INSTITUCION}}</b><small>Gestión {{GESTION}}</small></span>
+  <a href="/mi-asistencia">Mi asistencia</a>
+</div>
 <main>
-  <h1>Marcar asistencia</h1>
-  <p class="sub">Gestión {{GESTION}} · se marca en la materia que tiene clase ahora</p>
-  <div class="reloj" id="reloj">--:--</div>
+  <div class="heroe">
+    <div class="eyebrow">Marcar asistencia</div>
+    <div class="reloj" id="reloj">--:--</div>
+    <p>Se marca en la materia que tiene clase ahora</p>
+  </div>
   <div class="tarjeta caja" id="formulario">
     <div id="bloqueCodigo">
       <label for="codigo">Tu código o CI</label>
-      <input id="codigo" inputmode="text" autocomplete="off" placeholder="Ej. 1234567" maxlength="30">
+      <input id="codigo" inputmode="text" autocomplete="off" placeholder="1234567" maxlength="30">
     </div>
     <!-- capture="user" abre la cámara frontal: funciona en red local SIN https -->
     <input type="file" id="foto" accept="image/*" capture="user" hidden>
-    <button class="boton naranja" id="btnFoto">📷 Tomar selfie y marcar</button>
+    <button class="disparador" id="btnFoto" aria-label="Tomar selfie y marcar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Tomar selfie</button>
+    <p class="ayuda">Toca el botón: se abre la cámara frontal</p>
     <img class="vista" id="vista" alt="">
-    <div class="estado" id="estado"></div>
+    <div class="estado" id="estado" role="status" aria-live="polite"></div>
   </div>
   <div class="tarjeta consejos">
-    <b>Para que te reconozca:</b>
-    <ul><li>Mira de frente, con la cara completa y buena luz.</li><li>Sin gorra, lentes oscuros ni barbijo.</li>
-      <li>Solo tú en la foto, con el celular a la altura de los ojos.</li></ul>
+    <h3>Para que te reconozca</h3>
+    <div class="pasos"><div><i>💡</i>De frente y con buena luz</div><div><i>🧢</i>Sin gorra, lentes oscuros ni barbijo</div><div><i>🤳</i>Solo tú, a la altura de los ojos</div></div>
     <a href="/mi-asistencia">Consultar mi asistencia →</a>
   </div>
 </main>
-<div class="pie">IAR-600 · Inteligencia Artificial y Robótica · funciona sin internet</div>
+<div class="pie"><b>IAR-600</b> · Inteligencia Artificial y Robótica · funciona sin internet</div>
 <script>
 const HABILITADO = {{HABILITADO}}, PIDE_CODIGO = {{PIDE_CODIGO}};
 const $ = id => document.getElementById(id);
@@ -83,7 +111,7 @@ $('foto').onchange = async () => {
   if (!archivo) return;
   $('vista').src = URL.createObjectURL(archivo); $('vista').style.display = 'block';
   $('btnFoto').disabled = true;
-  estado('espera', '<b>Reconociendo tu rostro…</b>La red neuronal está comparando tu selfie.');
+  estado('espera', '<b>Reconociendo tu rostro</b>La red neuronal está comparando tu selfie.');
   try {
     const datos = new FormData();
     datos.append('codigo', $('codigo').value.trim());

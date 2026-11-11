@@ -21,26 +21,31 @@ namespace AsistenciaFacial.Interfaz
         {
             _cfg = cfg;
             Text = "Cartel con códigos QR";
-            Size = new Size(820, 900);
+            Size = new Size(860, 940);
             StartPosition = FormStartPosition.CenterParent;
-            BackColor = Tema.Fondo;
-            Font = Tema.Normal;
-            var arriba = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 46, Padding = new Padding(8, 8, 8, 0) };
-            arriba.Controls.Add(new Label { Text = "IP de esta laptop:", AutoSize = true, Margin = new Padding(3, 7, 3, 0) });
+            var cabecera = Tema.Preparar(this, "Cartel con códigos QR", "Imprímelo y pégalo en la puerta del aula");
+            var arriba = Tema.Fila(DockStyle.Top, new Padding(16, 12, 16, 8));
+            arriba.Controls.Add(Tema.Etiqueta("IP de esta laptop en el router", Tema.Semi));
             var ips = Red.IpsLocales();
             if (!string.IsNullOrWhiteSpace(cfg.IpParaQr) && !ips.Contains(cfg.IpParaQr)) ips.Insert(0, cfg.IpParaQr);
             _cmbIp.Items.AddRange(ips.Cast<object>().ToArray());
             _cmbIp.Text = ips[0];
-            _cmbIp.Width = 150;
+            _cmbIp.Width = 170;
+            Tema.EstiloCampo(_cmbIp);
+            _cmbIp.Margin = new Padding(4, 5, 14, 3);
             _cmbIp.SelectedIndexChanged += (s, e) => Generar();
             _cmbIp.Leave += (s, e) => Generar();
             arriba.Controls.Add(_cmbIp);
-            arriba.Controls.Add(Tema.Boton("Imprimir…", Tema.Azul, (s, e) => Imprimir()));
+            arriba.Controls.Add(Tema.Boton("🖨  Imprimir…", Tema.Naranja, (s, e) => Imprimir()));
             arriba.Controls.Add(Tema.Boton("Guardar imagen…", Tema.Suave, (s, e) => Guardar()));
             _pic.Dock = DockStyle.Fill;
             _pic.SizeMode = PictureBoxSizeMode.Zoom;
-            Controls.Add(_pic);
+            _pic.BackColor = Tema.Fondo;
+            var marco = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16, 4, 16, 16), BackColor = Tema.Fondo };
+            marco.Controls.Add(_pic);
+            Controls.Add(marco);
             Controls.Add(arriba);
+            cabecera.SendToBack();
             Generar();
         }
 
@@ -55,38 +60,65 @@ namespace AsistenciaFacial.Interfaz
             {
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+                g.InterpolationMode = InterpolationMode.NearestNeighbor;          // QR nítido
                 g.Clear(Color.White);
-                using (var franja = new SolidBrush(Tema.Tinta)) g.FillRectangle(franja, 0, 0, W, 330);
+                // franja institucional
+                using (var franja = new LinearGradientBrush(new Rectangle(0, 0, W, 380), Tema.MarinoProfundo, Tema.MarinoMedio, 0f))
+                    g.FillRectangle(franja, 0, 0, W, 380);
+                using (var naranja = new SolidBrush(Tema.Naranja)) g.FillRectangle(naranja, 0, 380, W, 22);
+                Tema.DibujarLogo(g, new RectangleF(W / 2f - 75, 40, 150, 150));
                 var centro = new StringFormat { Alignment = StringAlignment.Center };
-                using var f1 = new Font("Segoe UI", 90, FontStyle.Bold);
-                using var f2 = new Font("Segoe UI", 40);
-                using var f3 = new Font("Segoe UI", 44, FontStyle.Bold);
-                using var f4 = new Font("Consolas", 30);
-                g.DrawString("ASISTENCIA", f1, Brushes.White, new RectangleF(0, 40, W, 170), centro);
-                g.DrawString(_cfg.Institucion, f2, Brushes.White, new RectangleF(0, 220, W, 80), centro);
-                using var tinta = new SolidBrush(Tema.Tinta);
+                using var f1 = new Font("Segoe UI", 80, FontStyle.Bold);
+                using var f2 = new Font("Segoe UI", 38);
+                using var f3 = new Font("Segoe UI Semibold", 44);
+                using var f4 = new Font("Consolas", 28);
+                using var fPaso = new Font("Segoe UI", 40, FontStyle.Bold);
+                using var claro = new SolidBrush(Color.FromArgb(200, 212, 232));
+                g.DrawString("ASISTENCIA", f1, Brushes.White, new RectangleF(0, 190, W, 130), centro);
+                g.DrawString(_cfg.Institucion, f2, claro, new RectangleF(60, 305, W - 120, 70), centro);
+                using var tinta = new SolidBrush(Tema.Marino);
                 using var suave = new SolidBrush(Tema.Suave);
+                using var naranjaB = new SolidBrush(Tema.Naranja);
+                using var linea = new Pen(Tema.Linea, 6);
                 bool selfie = _cfg.MarcarDesdeCelular;
                 string principal = selfie ? "/marcar" : "/mi-asistencia", secundaria = selfie ? "/mi-asistencia" : "/";
                 g.DrawString(selfie ? "Al llegar, mira a la cámara del aula… o marca con una selfie desde tu celular."
-                                    : "Al llegar, mira a la cámara: tu asistencia se marca sola.", f2, tinta, new RectangleF(80, 400, W - 160, 160), centro);
+                                    : "Al llegar, mira a la cámara: tu asistencia se marca sola.", f2, suave, new RectangleF(120, 450, W - 240, 140), centro);
+
+                void Bloque(Rectangle marco, string qr, int paso, string titulo, string detalle, Font fDetalle)
+                {
+                    using (var path = Tema.Redondeado(marco, 40)) g.DrawPath(linea, path);
+                    using (var q = Qr(qr)) g.DrawImage(q, new Rectangle(marco.X + 50, marco.Y + 50, marco.Width - 100, marco.Width - 100));
+                    float yt = marco.Y + marco.Width - 30;
+                    if (paso > 0)
+                    {
+                        var tam = g.MeasureString(titulo, f3);
+                        float xc = marco.X + (marco.Width - tam.Width - 90) / 2f;
+                        g.FillEllipse(naranjaB, xc, yt + 6, 72, 72);
+                        g.DrawString(paso.ToString(), fPaso, Brushes.White, new RectangleF(xc, yt + 6, 72, 72), new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center });
+                        g.DrawString(titulo, f3, tinta, xc + 90, yt + 6);
+                    }
+                    else g.DrawString(titulo, f3, tinta, new RectangleF(marco.X, yt + 6, marco.Width, 80), centro);
+                    g.DrawString(detalle, fDetalle, suave, new RectangleF(marco.X + 20, yt + 92, marco.Width - 40, marco.Bottom - yt - 100), centro);
+                }
+
                 bool wifi = !string.IsNullOrWhiteSpace(_cfg.WifiNombre);
                 if (wifi)
                 {
-                    using var q = Qr(CodigosQr.TextoWifi(_cfg.WifiNombre, _cfg.WifiClave));
-                    g.DrawImage(q, new Rectangle(180, 620, 700, 700));
-                    g.DrawString("1. Conéctate al WiFi", f3, tinta, new RectangleF(80, 1340, 900, 80), centro);
-                    g.DrawString($"Red: {_cfg.WifiNombre}" + (string.IsNullOrEmpty(_cfg.WifiClave) ? "" : $"\nClave: {_cfg.WifiClave}"), f2, suave, new RectangleF(80, 1430, 900, 160), centro);
+                    Bloque(new Rectangle(130, 640, 820, 1060), CodigosQr.TextoWifi(_cfg.WifiNombre, _cfg.WifiClave), 1, "Conéctate al WiFi",
+                        $"Red: {_cfg.WifiNombre}" + (string.IsNullOrEmpty(_cfg.WifiClave) ? "" : $"\nClave: {_cfg.WifiClave}"), f2);
+                    Bloque(new Rectangle(1050, 640, 820, 1060), url + principal, 2, selfie ? "Marca con una selfie" : "Consulta TU asistencia", url + principal, f4);
                 }
-                using (var q = Qr(url + principal))
-                    g.DrawImage(q, new Rectangle(wifi ? 1120 : 650, 620, 700, 700));
-                g.DrawString((wifi ? "2. " : "") + (selfie ? "Marca con una selfie" : "Consulta TU asistencia"), f3, tinta, new RectangleF(wifi ? 1020 : 0, 1340, wifi ? 900 : W, 80), centro);
-                g.DrawString(url + principal, f4, suave, new RectangleF(wifi ? 1020 : 0, 1430, wifi ? 900 : W, 60), centro);
-                using (var q = Qr(url + secundaria))
-                    g.DrawImage(q, new Rectangle(800, 1700, 400, 400));
-                g.DrawString(selfie ? "Consulta tu asistencia" : "Lista de hoy", f3, tinta, new RectangleF(0, 2120, W, 80), centro);
-                g.DrawString(url + secundaria, f4, suave, new RectangleF(0, 2200, W, 60), centro);
-                g.DrawString("Control de asistencia con reconocimiento facial · funciona sin internet", f2, suave, new RectangleF(0, 2420, W, 80), centro);
+                else
+                    Bloque(new Rectangle(590, 640, 820, 1060), url + principal, 0, selfie ? "Marca con una selfie" : "Consulta TU asistencia", url + principal, f4);
+
+                // código secundario, más pequeño
+                using (var q = Qr(url + secundaria)) g.DrawImage(q, new Rectangle(260, 1800, 380, 380));
+                g.DrawString(selfie ? "Consulta tu asistencia" : "Lista de hoy", f3, tinta, 700, 1880);
+                g.DrawString(url + secundaria, f4, suave, 704, 1970);
+                using (var pie = new SolidBrush(Tema.MarinoBruma)) g.FillRectangle(pie, 0, H - 200, W, 200);
+                using (var naranja = new SolidBrush(Tema.Naranja)) g.FillRectangle(naranja, 0, H - 200, W, 8);
+                g.DrawString("Control de asistencia con reconocimiento facial · funciona sin internet", f2, suave, new RectangleF(0, H - 140, W, 80), centro);
             }
             var anterior = _cartel;
             _cartel = b;
@@ -104,13 +136,13 @@ namespace AsistenciaFacial.Interfaz
                 e.Graphics.DrawImage(_cartel, a.X + (a.Width - _cartel.Width * esc) / 2, a.Y, _cartel.Width * esc, _cartel.Height * esc);
             };
             using var vista = new PrintPreviewDialog { Document = doc, Width = 800, Height = 900 };
-            vista.ShowDialog(this);
+            vista.ShowDialog(Tema.Dueno(this));
         }
 
         void Guardar()
         {
             using var d = new SaveFileDialog { FileName = "cartel_asistencia.png", Filter = "PNG (*.png)|*.png" };
-            if (d.ShowDialog(this) == DialogResult.OK) _cartel.Save(d.FileName, System.Drawing.Imaging.ImageFormat.Png);
+            if (d.ShowDialog(Tema.Dueno(this)) == DialogResult.OK) _cartel.Save(d.FileName, System.Drawing.Imaging.ImageFormat.Png);
         }
 
         protected override void Dispose(bool disposing)

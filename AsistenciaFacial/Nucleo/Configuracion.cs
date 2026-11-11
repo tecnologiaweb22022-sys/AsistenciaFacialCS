@@ -61,7 +61,10 @@ namespace AsistenciaFacial.Nucleo
         public string Materia { get; set; } = "";
         public string Docente { get; set; } = "";
         public int Puerto { get; set; } = 5000;
-        public string PinAdmin { get; set; } = "1234";         // PIN del administrador (cada docente tiene el suyo)
+        public string UsuarioAdmin { get; set; } = "admin";   // usuario del administrador (cada docente tiene el suyo en la base)
+        public string ClaveAdmin { get; set; } = "";           // contraseña del administrador: sal:hash PBKDF2, nunca en texto
+        /// <summary>Versión anterior: PIN en texto. Se cifra en ClaveAdmin al arrancar y se borra del archivo.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public string PinAdmin { get; set; }
         public string IpParaQr { get; set; } = "";
         public string WifiNombre { get; set; } = "";
         public string WifiClave { get; set; } = "";
@@ -107,6 +110,26 @@ namespace AsistenciaFacial.Nucleo
             Directory.CreateDirectory(c.CarpetaDatos);
             return c;
         }
+
+        /// <summary>
+        /// Pasa el antiguo «pin_admin» (texto) a «clave_admin» cifrada y lo borra de config.json. true si cambió el archivo.
+        /// Para recuperar una contraseña olvidada: escribir «"pin_admin": "nueva-clave"» en config.json y abrir el programa.
+        /// </summary>
+        public bool MigrarClaveAdmin()
+        {
+            if (!string.IsNullOrEmpty(ClaveAdmin) && PinAdmin == null && !string.IsNullOrWhiteSpace(UsuarioAdmin)) return false;
+            if (!string.IsNullOrEmpty(PinAdmin)) ClaveAdmin = Claves.Hash(PinAdmin);
+            else if (string.IsNullOrEmpty(ClaveAdmin)) ClaveAdmin = Claves.Hash("1234");
+            if (string.IsNullOrWhiteSpace(UsuarioAdmin)) UsuarioAdmin = "admin";
+            PinAdmin = null;
+            Guardar();
+            return true;
+        }
+
+        public void CambiarClaveAdmin(string nueva) => ClaveAdmin = Claves.Hash(nueva);
+
+        public bool ValidarAdmin(string usuario, string clave) =>
+            Claves.Verificar(clave, Claves.NormalizarUsuario(usuario) == Claves.NormalizarUsuario(UsuarioAdmin) ? ClaveAdmin : null);
 
         public void Guardar() => File.WriteAllText(Path.Combine(Carpeta, "config.json"), JsonSerializer.Serialize(this, Json));
     }

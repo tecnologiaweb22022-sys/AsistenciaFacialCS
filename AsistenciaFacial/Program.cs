@@ -28,6 +28,7 @@ namespace AsistenciaFacial
                 cfg = Configuracion.Cargar();
                 db = new BaseDatos(cfg.BaseDeDatos);
                 db.Inicializar(sqliteAnterior: Path.Combine(cfg.CarpetaDatos, "asistencia.db"), legado: cfg);
+                cfg.MigrarClaveAdmin();          // el PIN en texto de config.json pasa a contraseña cifrada
             }
             catch (ErrorValidacion e)       // p. ej. el servicio de SQL Server no está iniciado
             {

@@ -1,32 +1,93 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ingreso · Control de asistencia</title>
+<meta name="theme-color" content="#0a1d3d">
+<meta name="robots" content="noindex">
+<title>Iniciar sesión · Control de asistencia</title>
 <link rel="stylesheet" href="/static/estilo.css">
 <style>
-  .caja{max-width:380px;margin:12vh auto;padding:28px}
-  h1{font-size:1.3rem;margin:0 0 4px} p{color:var(--suave);margin:0 0 18px}
-  label{display:block;font-weight:600;font-size:.9rem;margin:0 0 6px}
-  select{margin-bottom:14px}
-  input{font-size:1.6rem;text-align:center;letter-spacing:.4em;margin-bottom:12px}
-  button{width:100%;padding:.8em}
-  .error{color:var(--rojo);font-weight:600;margin-bottom:10px}
+  body{background:#fff}
+  .pantalla{display:grid;grid-template-columns:1.05fr 1fr;min-height:100vh}
+  /* panel de marca */
+  .marca{position:relative;overflow:hidden;color:#fff;padding:48px 56px;display:flex;flex-direction:column;
+         background:radial-gradient(500px 400px at 100% 0%,rgba(247,132,31,.35),transparent 65%),linear-gradient(160deg,var(--marino-800),var(--marino-950))}
+  .marca::before,.marca::after{content:"";position:absolute;border-radius:50%;border:2px solid rgba(255,255,255,.07)}
+  .marca::before{width:520px;height:520px;right:-180px;bottom:-200px}
+  .marca::after{width:340px;height:340px;right:-90px;bottom:-110px;border-color:rgba(247,132,31,.3)}
+  .marca .logo{width:56px;height:56px;border-radius:16px} .marca .logo svg{width:32px;height:32px}
+  .marca h1{font-size:3rem;margin:auto 0 14px;max-width:11ch}
+  .marca h1 span{color:var(--naranja-400)}
+  .marca p{color:var(--marino-200);max-width:36ch;margin:0;font-size:1.02rem}
+  .rasgos{display:flex;gap:10px;flex-wrap:wrap;margin:28px 0 auto}
+  .rasgos span{padding:.45em 1em;border-radius:999px;background:rgba(255,255,255,.08);font-size:.82rem;font-weight:600}
+  .inst{position:relative;z-index:1;color:var(--marino-300);font-size:.85rem;margin-top:36px}
+  .inst b{display:block;color:#fff;font-size:.95rem}
+  /* formulario */
+  .lado{display:flex;align-items:center;justify-content:center;padding:40px 24px}
+  form{width:100%;max-width:400px}
+  form h2{font-size:2rem;margin:0;color:var(--marino-900)}
+  form > p{color:var(--suave);margin:6px 0 28px}
+  label{display:block;margin:0 0 8px}
+  .campo{position:relative;margin-bottom:18px}
+  .campo > svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);width:20px;height:20px;color:var(--tenue);pointer-events:none}
+  .campo input{padding:.85em 1em .85em 3em;font-size:1.02rem;border-radius:16px}
+  .campo input#clave{padding-right:3.2em}
+  .ojo{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:transparent;color:var(--suave);padding:.5em;border-radius:12px}
+  .ojo:hover{background:var(--marino-100);color:var(--marino-800)} .ojo svg{width:20px;height:20px}
+  .mayus{display:none;color:var(--ambar-texto);font-size:.82rem;font-weight:600;margin:-8px 0 14px}
+  #entrar{width:100%;padding:1em;font-size:1.05rem;margin-top:6px}
+  .seguro{display:flex;gap:8px;align-items:center;color:var(--tenue);font-size:.8rem;margin-top:18px} .seguro svg{width:16px;height:16px;flex:none}
+  .volver{margin-top:22px;font-size:.9rem} .volver a{color:var(--suave);text-decoration:none} .volver a:hover{color:var(--naranja-600)}
+  @media(max-width:860px){.pantalla{grid-template-columns:1fr}.marca{padding:28px 24px 30px}.marca h1{font-size:2rem;margin-top:24px}.rasgos{margin:18px 0 0}.inst{display:none}
+    .lado{padding:28px 20px 40px;align-items:flex-start}}
 </style></head>
 <body>
-<form class="caja tarjeta" method="post" id="f">
-  <h1>Panel de asistencia</h1>
-  <p>{{INSTITUCION}} · Gestión {{GESTION}}</p>
-  {{ERROR}}
-  <label for="usuario">¿Quién eres?</label>
-  <select name="usuario" id="usuario">{{USUARIOS}}</select>
-  <label for="pin">PIN</label>
-  <input name="pin" id="pin" type="password" inputmode="numeric" autocomplete="current-password" autofocus required>
-  <button>Entrar</button>
-  <p style="margin-top:16px;font-size:.85rem"><a href="/">← Volver a la vista pública</a></p>
-</form>
+<div class="pantalla">
+  <section class="marca">
+    <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
+    <h1>Control de <span>asistencia</span></h1>
+    <p>Reconocimiento facial con inteligencia artificial, en la red del aula y sin internet.</p>
+    <div class="rasgos"><span>Cámara del aula</span><span>Selfie desde el celular</span><span>Reportes por materia</span></div>
+    <div class="inst"><b>{{INSTITUCION}}</b>Gestión {{GESTION}}</div>
+  </section>
+  <section class="lado">
+    <form method="post" id="f" autocomplete="on">
+      <h2>Iniciar sesión</h2>
+      <p>Panel para docentes y administración</p>
+      {{ERROR}}
+      <label for="usuario">Usuario</label>
+      <div class="campo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        <input name="usuario" id="usuario" value="{{USUARIO_PREVIO}}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="ej. maria.quispe" maxlength="40" required>
+      </div>
+      <label for="clave">Contraseña</label>
+      <div class="campo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <input name="clave" id="clave" type="password" autocomplete="current-password" placeholder="••••••••" maxlength="100" required>
+        <button type="button" class="ojo" id="ojo" aria-label="Mostrar contraseña" title="Mostrar contraseña"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+      </div>
+      <div class="mayus" id="mayus">⇪ Bloq Mayús está activado</div>
+      <button class="naranja" id="entrar">Entrar al panel
+        <svg class="icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <div class="seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Contraseñas cifradas · tras 5 intentos fallidos el acceso se bloquea 1 minuto</div>
+      <div class="volver"><a href="/">← Volver a la vista pública</a></div>
+    </form>
+  </section>
+</div>
 <script>
-// recuerda quién entró la última vez en este celular
-const sel = document.getElementById('usuario');
-try { const u = localStorage.getItem('usuario'); if (u && [...sel.options].some(o => o.value === u)) sel.value = u; } catch(e) {}
-document.getElementById('f').addEventListener('submit', () => { try { localStorage.setItem('usuario', sel.value); } catch(e) {} });
+const usuario = document.getElementById('usuario'), clave = document.getElementById('clave');
+// recuerda el usuario (nunca la contraseña) en este dispositivo
+try { if (!usuario.value) usuario.value = localStorage.getItem('usuario') || ''; } catch(e) {}
+(usuario.value ? clave : usuario).focus();
+document.getElementById('f').addEventListener('submit', () => {
+  try { localStorage.setItem('usuario', usuario.value.trim()); } catch(e) {}
+  const b = document.getElementById('entrar'); b.disabled = true; b.firstChild.textContent = 'Verificando… ';
+});
+document.getElementById('ojo').onclick = () => {
+  const ver = clave.type === 'password'; clave.type = ver ? 'text' : 'password';
+  const o = document.getElementById('ojo'); o.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña'); o.title = o.getAttribute('aria-label');
+  clave.focus();
+};
+const mayus = e => { if (e.getModifierState) document.getElementById('mayus').style.display = e.getModifierState('CapsLock') ? 'block' : 'none'; };
+clave.addEventListener('keyup', mayus); clave.addEventListener('keydown', mayus);
 </script>
 </body></html>

@@ -12,7 +12,8 @@ namespace AsistenciaFacial.Interfaz
     internal sealed class FormConfiguracion : Form
     {
         readonly Configuracion _cfg;
-        readonly TextBox _inst = new TextBox(), _pin = new TextBox(), _wifi = new TextBox(), _clave = new TextBox();
+        readonly TextBox _inst = new TextBox(), _wifi = new TextBox(), _clave = new TextBox(), _usuarioAdmin = new TextBox { MaxLength = 30 },
+            _claveAdmin = new TextBox { UseSystemPasswordChar = true, MaxLength = 100 }, _repetirAdmin = new TextBox { UseSystemPasswordChar = true, MaxLength = 100 };
         readonly NumericUpDown _anticipacion = new NumericUpDown { Minimum = 0, Maximum = 60 },
             _salidaAntes = new NumericUpDown { Minimum = 0, Maximum = 60 }, _salidaDespues = new NumericUpDown { Minimum = 0, Maximum = 120 },
             _umbral = new NumericUpDown { Minimum = 0.30m, Maximum = 0.80m, Increment = 0.01m, DecimalPlaces = 2 },
@@ -29,11 +30,10 @@ namespace AsistenciaFacial.Interfaz
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = MinimizeBox = false;
             StartPosition = FormStartPosition.CenterParent;
-            ClientSize = new Size(600, 560);
-            Font = Tema.Normal;
-            BackColor = Tema.Papel;
+            ClientSize = new Size(660, 560);
+            Tema.Preparar(this, "Configuración", "Institución, horario, reconocimiento facial y opciones de la web", Tema.Papel);
             _inst.Text = cfg.Institucion;
-            _pin.Text = cfg.PinAdmin; _wifi.Text = cfg.WifiNombre; _clave.Text = cfg.WifiClave; _publica.Checked = cfg.ListaPublica;
+            _usuarioAdmin.Text = cfg.UsuarioAdmin; _wifi.Text = cfg.WifiNombre; _clave.Text = cfg.WifiClave; _publica.Checked = cfg.ListaPublica;
             _selfie.Checked = cfg.MarcarDesdeCelular; _pideCodigo.Checked = cfg.CelularPideCodigo;
             _anticipacion.Value = Math.Min(60, Math.Max(0, cfg.Horario.AnticipacionMin));
             _salidaAntes.Value = Math.Min(60, Math.Max(0, cfg.Horario.SalidaAntesMin));
@@ -42,25 +42,34 @@ namespace AsistenciaFacial.Interfaz
             _confirm.Value = Math.Min(10, Math.Max(1, cfg.Reconocimiento.Confirmaciones));
             _minimo.Value = Math.Min(300, Math.Max(30, cfg.Reconocimiento.RostroMinimoPx));
 
-            int y = 12;
-            void Titulo(string t) { Controls.Add(new Label { Text = t, Left = 12, Top = y, AutoSize = true, Font = Tema.Negrita, ForeColor = Tema.Azul }); y += 28; }
+            // contenido con desplazamiento: entra en pantallas de 768 px de alto
+            var cuerpo = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Tema.Papel };
+            int y = 18;
+            void Titulo(string t)
+            {
+                if (y > 20) y += 10;
+                cuerpo.Controls.Add(new Label { Text = t.ToUpperInvariant(), Left = 24, Top = y, AutoSize = true, Font = Tema.SemiChica, ForeColor = Tema.NaranjaOscuro });
+                cuerpo.Controls.Add(new Panel { Left = 24, Top = y + 22, Width = 590, Height = 1, BackColor = Tema.Linea });
+                y += 34;
+            }
             void Fila(string t, Control c, string ayuda = null)
             {
-                Controls.Add(new Label { Text = t, Left = 20, Top = y + 3, Width = 190 });
-                c.Left = 215; c.Top = y;
-                if (c is TextBox) c.Width = 360; else if (c is CheckBox) { } else c.Width = 90;
-                Controls.Add(c);
-                if (ayuda != null) Controls.Add(new Label { Text = ayuda, Left = 315, Top = y + 3, Width = 270, ForeColor = Tema.Suave, Font = Tema.Chica });
-                y += 32;
+                cuerpo.Controls.Add(new Label { Text = t, Left = 24, Top = y + 5, Width = 200, ForeColor = Tema.Tinta });
+                Tema.EstiloCampo(c);
+                c.Left = 230; c.Top = y;
+                if (c is TextBox) c.Width = 384; else if (c is CheckBox) { } else c.Width = 90;
+                cuerpo.Controls.Add(c);
+                if (ayuda != null) cuerpo.Controls.Add(new Label { Text = ayuda, Left = 332, Top = y + 6, Width = 290, ForeColor = Tema.Suave, Font = Tema.Chica });
+                y += 38;
             }
             Titulo("Institución");
             Fila("Nombre", _inst);
-            Controls.Add(new Label
+            cuerpo.Controls.Add(new Label
             {
-                Text = "Gestiones, docentes, materias y horarios: botón «Académico».", Left = 20, Top = y, AutoSize = true,
-                ForeColor = Tema.Suave, Font = Tema.Chica,
+                Text = "ℹ  Gestiones, docentes, materias y horarios se configuran en el botón «Académico».", Left = 24, Top = y, Width = 590, Height = 30,
+                ForeColor = Tema.MarinoMedio, BackColor = Tema.MarinoBruma, Font = Tema.Chica, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0),
             });
-            y += 26;
+            y += 36;
             Titulo("Horario");
             Fila("Entrada desde (min antes)", _anticipacion, "antes del inicio de cada clase");
             Fila("Salida desde (min antes)", _salidaAntes, "antes del fin de la clase");
@@ -69,22 +78,44 @@ namespace AsistenciaFacial.Interfaz
             Fila("Umbral de similitud", _umbral, "más alto = más exigente (0,42)");
             Fila("Confirmaciones", _confirm, "cuadros seguidos antes de marcar");
             Fila("Rostro mínimo (px)", _minimo, "rostros más chicos se ignoran");
+            Titulo("Acceso del administrador");
+            Fila("Usuario", _usuarioAdmin);
+            Fila("Nueva contraseña", _claveAdmin);
+            Fila("Repetir contraseña", _repetirAdmin);
+            _claveAdmin.PlaceholderText = $"vacío = no cambiar · mínimo {Claves.LargoMinimo} caracteres";
             Titulo("Web y red");
-            Fila("PIN del administrador", _pin); Fila("Red WiFi (para el QR)", _wifi); Fila("Clave del WiFi", _clave);
-            foreach (var c in new[] { _publica, _selfie, _pideCodigo }) { c.Left = 20; c.Top = y; Controls.Add(c); y += 28; }
-            y += 6;
-            var ok = Tema.Boton("Guardar", Tema.Verde, (s, e) => Guardar());
+            Fila("Red WiFi (para el QR)", _wifi); Fila("Clave del WiFi", _clave);
+            foreach (var c in new[] { _publica, _selfie, _pideCodigo })
+            {
+                c.Left = 24; c.Top = y; c.ForeColor = Tema.Tinta; c.Cursor = Cursors.Hand;
+                cuerpo.Controls.Add(c);
+                y += 30;
+            }
+            cuerpo.Controls.Add(new Panel { Left = 0, Top = y, Width = 1, Height = 16 });       // margen inferior al desplazar
+            Controls.Add(cuerpo);
+            var ok = Tema.Boton("Guardar cambios", Tema.Naranja, (s, e) => Guardar());
             var no = Tema.Boton("Cancelar", Tema.Suave, (s, e) => Close());
-            ok.Location = new Point(400, y); no.Location = new Point(490, y);
-            Controls.Add(ok); Controls.Add(no);
-            ClientSize = new Size(600, y + 50);
+            Tema.Pie(this, ok, no);
+            cuerpo.BringToFront();
+            AcceptButton = ok;
+            CancelButton = no;
+            int alto = 68 + y + 16 + 60;
+            ClientSize = new Size(660, Math.Min(alto, Math.Max(480, Screen.FromPoint(Cursor.Position).WorkingArea.Height - 80)));
         }
 
         void Guardar()
         {
-            if (_pin.Text.Trim().Length < 4) { MessageBox.Show("El PIN debe tener al menos 4 caracteres.", Text); return; }
+            string usuario = Claves.NormalizarUsuario(_usuarioAdmin.Text);
+            try
+            {
+                Claves.ValidarUsuario(usuario);
+                if (_claveAdmin.Text.Length > 0 || _repetirAdmin.Text.Length > 0) Claves.ValidarNueva(_claveAdmin.Text, _repetirAdmin.Text);
+            }
+            catch (ErrorValidacion ex) { MessageBox.Show(ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             _cfg.Institucion = _inst.Text.Trim();
-            _cfg.PinAdmin = _pin.Text.Trim(); _cfg.WifiNombre = _wifi.Text.Trim(); _cfg.WifiClave = _clave.Text; _cfg.ListaPublica = _publica.Checked;
+            _cfg.UsuarioAdmin = usuario;
+            if (_claveAdmin.Text.Length > 0) _cfg.CambiarClaveAdmin(_claveAdmin.Text);
+            _cfg.WifiNombre = _wifi.Text.Trim(); _cfg.WifiClave = _clave.Text; _cfg.ListaPublica = _publica.Checked;
             _cfg.MarcarDesdeCelular = _selfie.Checked; _cfg.CelularPideCodigo = _pideCodigo.Checked;
             _cfg.Horario.AnticipacionMin = (int)_anticipacion.Value;
             _cfg.Horario.SalidaAntesMin = (int)_salidaAntes.Value;

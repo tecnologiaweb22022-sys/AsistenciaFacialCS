@@ -23,7 +23,7 @@ namespace AsistenciaFacial.Nucleo
     /// sin internet: http://IP-DE-LA-LAPTOP:5000
     ///   /               clases en curso y quién llegó (pantalla del aula)
     ///   /mi-asistencia  cada estudiante consulta su asistencia por materia con su código
-    ///   /admin          panel web (administrador o docente con su PIN): lista por materia, correcciones, reportes, cámara
+    ///   /admin          panel web (administrador o docente con usuario y contraseña): lista por materia, correcciones, reportes, cámara
     /// </summary>
     public sealed class ServidorWeb
     {
@@ -227,37 +227,36 @@ namespace AsistenciaFacial.Nucleo
                 });
             });
 
-            // ── sesión: administrador o docente, cada uno con su PIN ──
-            IResult Ingreso(string error) => Pagina("login.html", new Dictionary<string, string>
+            // ── sesión: administrador o docente, cada uno con su usuario y contraseña ──
+            IResult Ingreso(string error, string usuario = "") => Pagina("login.html", new Dictionary<string, string>
             {
-                ["ERROR"] = error.Length > 0 ? $"<div class=\"error\">{E(error)}</div>" : "",
-                ["USUARIOS"] = string.Concat(_db.Docentes(soloActivos: true).Select(d => $"<option value=\"{d.Id}\">{E(d.NombreCompleto)}</option>"))
-                               + "<option value=\"0\">Administrador</option>",
+                ["ERROR"] = error.Length > 0 ? $"<div class=\"error\" role=\"alert\">{E(error)}</div>" : "",
+                ["USUARIO_PREVIO"] = E(usuario),
             });
             app.MapGet("/login", () => Ingreso(""));
             app.MapPost("/login", async (HttpContext ctx) =>
             {
                 var form = await ctx.Request.ReadFormAsync();
-                string pin = form["pin"].ToString();
-                long.TryParse(form["usuario"].ToString(), out long docenteId);
-                Usuario u = null;
-                if (docenteId == 0)
-                {
-                    if (CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(pin), Encoding.UTF8.GetBytes(_cfg.PinAdmin)))
-                        u = new Usuario { EsAdmin = true, Nombre = "Administrador" };
-                }
-                else if (_db.ValidarDocente(docenteId, pin) is Docente d)
-                    u = new Usuario { DocenteId = d.Id, Nombre = d.NombreCompleto };
+                string usuario = Claves.NormalizarUsuario(form["usuario"].ToString()), clave = form["clave"].ToString();
+                string ip = "web:" + (ctx.Connection.RemoteIpAddress?.ToString() ?? "?"), cuenta = "usuario:" + usuario;
+                int espera = Math.Max(Claves.SegundosBloqueado(ip), Claves.SegundosBloqueado(cuenta));
+                if (espera > 0) return Ingreso($"Demasiados intentos fallidos. Espera {espera} segundos e inténtalo de nuevo.", usuario);
+                var u = usuario.Length == 0 ? null : await Task.Run(() => Claves.Ingresar(_cfg, _db, usuario, clave));
                 if (u != null)
                 {
+                    Claves.RegistrarExito(ip);
+                    Claves.RegistrarExito(cuenta);
                     string token = Convert.ToHexString(RandomNumberGenerator.GetBytes(24));
                     _sesiones[token] = u;
                     ctx.Response.Cookies.Append("sesion", token, new CookieOptions { HttpOnly = true, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromDays(7) });
                     string destino = ctx.Request.Query["siguiente"].ToString();
                     return Results.Redirect(destino.StartsWith("/") && !destino.StartsWith("//") ? destino : "/admin");
                 }
+                Claves.RegistrarFallo(ip);
+                Claves.RegistrarFallo(cuenta);
+                _db.EventoSistema("ingreso_fallido", $"Intento de ingreso fallido al panel web con el usuario «{usuario}» desde {ip.Substring(4)}", false, null);
                 await Task.Delay(800);
-                return Ingreso("PIN incorrecto");
+                return Ingreso("Usuario o contraseña incorrectos.", usuario);
             });
             app.MapGet("/logout", (HttpContext ctx) =>
             {
@@ -478,24 +477,35 @@ namespace AsistenciaFacial.Nucleo
             string ip = !string.IsNullOrWhiteSpace(ipPedida) ? ipPedida : !string.IsNullOrWhiteSpace(_cfg.IpParaQr) ? _cfg.IpParaQr : ips[0];
             string url = $"http://{ip}:{_cfg.Puerto}";
             var sb = new StringBuilder();
+            const string logo = "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3\"/><circle cx=\"12\" cy=\"10\" r=\"3\"/><path d=\"M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3\"/></svg>";
             sb.Append($@"<!doctype html><html lang=""es""><head><meta charset=""utf-8""><meta name=""viewport"" content=""width=device-width,initial-scale=1"">
 <title>Cartel QR · Asistencia</title><link rel=""stylesheet"" href=""/static/estilo.css""><style>
-main{{max-width:820px;margin:0 auto;padding:18px}} .config{{padding:14px;margin-bottom:16px}} .config select{{width:auto}}
-.cartel{{background:#fff;border:2px dashed #c9c1b0;border-radius:18px;padding:26px;text-align:center}}
-.cartel h1{{margin:0;color:var(--azul)}} .cartel h2{{margin:4px 0 18px;color:var(--suave);font-weight:600;font-size:1.1rem}}
-.qrs{{display:flex;justify-content:center;gap:28px;flex-wrap:wrap}} .qrs b{{display:block;margin-top:6px}} code{{color:var(--suave);font-size:.85rem}}
-@media print{{.barra,.config{{display:none}} body{{background:#fff}} main{{padding:0}}}}</style></head><body>
-<div class=""barra""><div class=""marca"">Cartel con códigos QR<small>Imprime (Ctrl + P) y pégalo en la puerta del aula</small></div></div>
-<main><div class=""tarjeta config""><form method=""get"">IP de esta laptop en el router: <select name=""ip"" onchange=""this.form.submit()"">");
+main{{max-width:880px;margin:0 auto;padding:24px 18px}} .config{{padding:14px 18px;margin-bottom:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between}}
+.config form{{display:flex;gap:10px;align-items:center}} .config select{{width:auto}}
+.cartel{{background:#fff;border-radius:22px;overflow:hidden;box-shadow:var(--sombra-2);text-align:center}}
+.cartel .cab{{background:linear-gradient(120deg,var(--marino-950),var(--marino-700));color:#fff;padding:30px 24px 26px;border-bottom:6px solid var(--naranja-500)}}
+.cartel .logo{{width:64px;height:64px;border-radius:18px;margin:0 auto 12px}} .cartel .logo svg{{width:38px;height:38px}}
+.cartel h1{{margin:0;font-size:2.4rem;letter-spacing:.06em}} .cartel h2{{margin:6px 0 0;color:rgba(255,255,255,.78);font-weight:600;font-size:1.05rem}}
+.qrs{{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;padding:30px 24px 10px}}
+.qr{{border:2px solid var(--linea);border-radius:18px;padding:16px 18px 14px;min-width:220px;max-width:300px}} .qr svg{{display:block;margin:0 auto}}
+.qr b{{display:block;margin-top:10px;color:var(--marino-900);font-size:1.02rem}} .qr code{{color:var(--suave);font-size:.78rem;word-break:break-all}}
+.paso{{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--naranja-500);color:#fff;font-size:.85rem;margin-right:6px}}
+.cartel .nota{{color:var(--suave);margin:14px 24px 28px}}
+@media print{{.barra,.config{{display:none}} body{{background:#fff}} main{{padding:0}} .cartel{{box-shadow:none}} *{{-webkit-print-color-adjust:exact;print-color-adjust:exact}}}}</style></head><body>
+<header class=""barra""><div class=""marca""><div class=""logo"">{logo}</div><span><b>Cartel con códigos QR</b><small>Imprime (Ctrl + P) y pégalo en la puerta del aula</small></span></div></header>
+<main><div class=""tarjeta config""><form method=""get""><label for=""ip"">IP de esta laptop en el router</label><select id=""ip"" name=""ip"" onchange=""this.form.submit()"">");
             foreach (var i in ips.Union(new[] { ip })) sb.Append($"<option{(i == ip ? " selected" : "")}>{E(i)}</option>");
-            sb.Append($@"</select></form></div><div class=""cartel""><h1>Control de asistencia</h1><h2>{E(_cfg.Institucion)}</h2><div class=""qrs"">");
+            sb.Append($@"</select></form><button class=""naranja"" onclick=""print()"">🖨 Imprimir</button></div>
+<div class=""cartel""><div class=""cab""><div class=""logo"">{logo}</div><h1>ASISTENCIA</h1><h2>{E(_cfg.Institucion)}</h2></div><div class=""qrs"">");
+            int n = 0;
+            string Paso() => $"<span class=\"paso\">{++n}</span>";
             if (!string.IsNullOrWhiteSpace(_cfg.WifiNombre))
-                sb.Append($"<div>{CodigosQr.Svg(CodigosQr.TextoWifi(_cfg.WifiNombre, _cfg.WifiClave), 5)}<b>① Conéctate al WiFi «{E(_cfg.WifiNombre)}»</b></div>");
+                sb.Append($"<div class=\"qr\">{CodigosQr.Svg(CodigosQr.TextoWifi(_cfg.WifiNombre, _cfg.WifiClave), 5)}<b>{Paso()}Conéctate al WiFi</b><code>{E(_cfg.WifiNombre)}</code></div>");
             if (_cfg.MarcarDesdeCelular)
-                sb.Append($"<div>{CodigosQr.Svg(url + "/marcar", 5)}<b>② Marca con una selfie</b><code>{E(url)}/marcar</code></div>");
-            sb.Append($"<div>{CodigosQr.Svg(url + "/mi-asistencia", 5)}<b>Consulta TU asistencia</b><code>{E(url)}/mi-asistencia</code></div>");
-            sb.Append($"<div>{CodigosQr.Svg(url + "/", 5)}<b>Asistencia de hoy</b><code>{E(url)}/</code></div>");
-            sb.Append("</div><p style=\"color:var(--suave);margin-top:18px\">Para marcar asistencia: mira a la cámara al llegar (o usa la selfie si el docente lo permite). No necesitas internet.</p></div></main></body></html>");
+                sb.Append($"<div class=\"qr\">{CodigosQr.Svg(url + "/marcar", 5)}<b>{Paso()}Marca con una selfie</b><code>{E(url)}/marcar</code></div>");
+            sb.Append($"<div class=\"qr\">{CodigosQr.Svg(url + "/mi-asistencia", 5)}<b>Consulta TU asistencia</b><code>{E(url)}/mi-asistencia</code></div>");
+            sb.Append($"<div class=\"qr\">{CodigosQr.Svg(url + "/", 5)}<b>Asistencia de hoy</b><code>{E(url)}/</code></div>");
+            sb.Append("</div><p class=\"nota\">Para marcar asistencia: <b>mira a la cámara al llegar</b> (o usa la selfie si el docente lo permite). No necesitas internet.</p></div></main></body></html>");
             return sb.ToString();
         }
     }
