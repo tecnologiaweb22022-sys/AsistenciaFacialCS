@@ -31,7 +31,7 @@
     <PackageReference Include="OpenCvSharp4.Windows" Version="4.11.0.20250507" />
     <PackageReference Include="OpenCvSharp4.Extensions" Version="4.11.0.20250507" />
     
-    <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.1" />
     <!-- Solo para importar una vez los datos del antiguo datos/asistencia.db (SQLite) -->
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
     

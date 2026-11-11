@@ -38,14 +38,17 @@ namespace AsistenciaFacial.Nucleo
         public int CalidadJpeg { get; set; } = 70;
     }
 
-    /// <summary>Conexión a MariaDB (XAMPP). La base se crea sola si no existe.</summary>
+    /// <summary>Conexión a SQL Server. La base se crea sola si no existe.</summary>
     public class ConfigBaseDatos
     {
-        public string Servidor { get; set; } = "localhost";
-        public int Puerto { get; set; } = 3306;
+        public string Servidor { get; set; } = "localhost";    // nombre del equipo, o EQUIPO\SQLEXPRESS si es instancia con nombre
+        public int Puerto { get; set; } = 0;                    // 0 = el de la instancia; 1433 u otro para forzar TCP
         public string Nombre { get; set; } = "asistencia";
-        public string Usuario { get; set; } = "root";          // XAMPP trae root sin clave: mejor crear un usuario propio
+        public string Usuario { get; set; } = "";               // vacío = autenticación de Windows; si no, inicio de sesión SQL
         public string Clave { get; set; } = "";
+
+        /// <summary>¿Son los datos de la versión con MariaDB (XAMPP)? Puerto 3306 nunca es SQL Server.</summary>
+        [JsonIgnore] public bool EsDeMariaDb => Puerto == 3306;
     }
 
     /// <summary>Lee y guarda config.json (está junto al .exe).</summary>
@@ -94,6 +97,12 @@ namespace AsistenciaFacial.Nucleo
             c.Reconocimiento ??= new ConfigReconocimiento();
             bool sinBase = c.BaseDeDatos == null;                  // config.json de la versión con SQLite
             c.BaseDeDatos ??= new ConfigBaseDatos();
+            if (c.BaseDeDatos.EsDeMariaDb)                         // config.json de la versión con MariaDB: pasa a SQL Server local
+            {
+                string nombre = string.IsNullOrWhiteSpace(c.BaseDeDatos.Nombre) ? "asistencia" : c.BaseDeDatos.Nombre;
+                c.BaseDeDatos = new ConfigBaseDatos { Nombre = nombre };
+                sinBase = true;
+            }
             if (!File.Exists(ruta) || sinBase) c.Guardar();
             Directory.CreateDirectory(c.CarpetaDatos);
             return c;

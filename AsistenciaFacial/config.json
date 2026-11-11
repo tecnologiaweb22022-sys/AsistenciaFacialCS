@@ -30,10 +30,10 @@
     "calidad_jpeg": 70
   },
   "base_de_datos": {
-    "servidor": "localhost",
-    "puerto": 3306,
+    "servidor": "DESKTOP-16132LP",
+    "puerto": 0,
     "nombre": "asistencia",
-    "usuario": "root",
+    "usuario": "",
     "clave": ""
   }
 }

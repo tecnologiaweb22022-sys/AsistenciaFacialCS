@@ -29,7 +29,7 @@ namespace AsistenciaFacial
                 db = new BaseDatos(cfg.BaseDeDatos);
                 db.Inicializar(sqliteAnterior: Path.Combine(cfg.CarpetaDatos, "asistencia.db"), legado: cfg);
             }
-            catch (ErrorValidacion e)       // p. ej. MariaDB (XAMPP) no está iniciado
+            catch (ErrorValidacion e)       // p. ej. el servicio de SQL Server no está iniciado
             {
                 MessageBox.Show(e.Message, "No se puede abrir la base de datos", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;

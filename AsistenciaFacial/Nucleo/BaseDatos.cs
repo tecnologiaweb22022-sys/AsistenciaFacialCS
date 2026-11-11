@@ -1,88 +1,80 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
-using MySqlConnector;
 
 namespace AsistenciaFacial.Nucleo
 {
     /// <summary>
-    /// Base de datos MariaDB (la de XAMPP): gestiones, docentes, materias con su horario semanal,
-    /// estudiantes inscritos por semestre, vectores de sus rostros, marcas de asistencia
-    /// (una por estudiante, materia y día) y alertas. Funciona en la red local, sin internet.
-    /// La usan igual la ventana Windows Forms y la web.
+    /// Base de datos SQL Server (2014 o posterior, también Express/LocalDB): gestiones, docentes,
+    /// materias con su horario semanal, estudiantes inscritos por semestre, vectores de sus rostros,
+    /// marcas de asistencia (una por estudiante, materia y día) y alertas. Funciona en la red local,
+    /// sin internet. La usan igual la ventana Windows Forms y la web.
     /// </summary>
     public class BaseDatos
     {
         public static readonly string[] EstadosMarca = { "puntual", "atraso", "justificado" };
 
-        // En MariaDB las claves foráneas deben ir como FOREIGN KEY al final de la tabla:
-        // un REFERENCES escrito junto a la columna se ignora en silencio.
+        // Cada sentencia se puede repetir sin daño (IF ... IS NULL): se ejecuta en cada arranque.
         // «asistencias» se crea con su forma original (sin materia) y ActualizarEsquema la completa:
-        // así una base vieja y una nueva siguen exactamente el mismo camino.
-        const string Esquema = @"
-CREATE TABLE IF NOT EXISTS estudiantes (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, codigo VARCHAR(30) NOT NULL UNIQUE, nombres VARCHAR(60) NOT NULL,
-    apellidos VARCHAR(60) NOT NULL DEFAULT '', curso VARCHAR(100) NOT NULL DEFAULT '', activo INT NOT NULL DEFAULT 1,
-    creado DOUBLE NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- Cada fila es una muestra del rostro: el VECTOR de 128 números que calcula la red SFace
--- (no se guarda la foto completa, solo un recorte chico de 112×112 para mostrarlo).
-CREATE TABLE IF NOT EXISTS rostros (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, estudiante_id BIGINT NOT NULL,
-    vector BLOB NOT NULL, foto MEDIUMBLOB, creado DOUBLE NOT NULL,
-    INDEX ix_rostros_estudiante (estudiante_id),
-    FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE IF NOT EXISTS asistencias (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, estudiante_id BIGINT NOT NULL,
-    fecha VARCHAR(10) NOT NULL, hora DOUBLE NOT NULL, estado VARCHAR(20) NOT NULL, similitud DOUBLE NOT NULL DEFAULT 0,
-    fuente VARCHAR(20) NOT NULL DEFAULT 'camara', observacion VARCHAR(120) NOT NULL DEFAULT '',
-    UNIQUE (estudiante_id, fecha), INDEX ix_asistencias_fecha (fecha),
-    FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE IF NOT EXISTS eventos (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, estudiante_id BIGINT NULL, tipo VARCHAR(40) NOT NULL, mensaje TEXT NOT NULL,
-    prioridad VARCHAR(10) NOT NULL DEFAULT 'normal', fuente VARCHAR(20) NOT NULL, atendido INT NOT NULL DEFAULT 0, creado DOUBLE NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- Periodos académicos: I-2026 (1ro, 3ro, 5to), II-2026 (2do, 4to, 6to). Solo una gestión está activa.
-CREATE TABLE IF NOT EXISTS gestiones (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, nombre VARCHAR(20) NOT NULL UNIQUE,
-    inicio VARCHAR(10) NOT NULL, fin VARCHAR(10) NOT NULL, activa INT NOT NULL DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- El PIN se guarda como sal:hash (PBKDF2), nunca en texto.
-CREATE TABLE IF NOT EXISTS docentes (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, nombres VARCHAR(60) NOT NULL, apellidos VARCHAR(60) NOT NULL DEFAULT '',
-    pin VARCHAR(120) NOT NULL DEFAULT '', activo INT NOT NULL DEFAULT 1, creado DOUBLE NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-CREATE TABLE IF NOT EXISTS materias (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, gestion_id BIGINT NOT NULL, semestre INT NOT NULL,
-    sigla VARCHAR(20) NOT NULL DEFAULT '', nombre VARCHAR(100) NOT NULL, docente_id BIGINT NULL,
-    tolerancia_min INT NOT NULL DEFAULT 10,
-    INDEX ix_materias_gestion (gestion_id, semestre),
-    FOREIGN KEY (gestion_id) REFERENCES gestiones(id) ON DELETE CASCADE,
-    FOREIGN KEY (docente_id) REFERENCES docentes(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- Horario semanal: dia 1 = lunes … 7 = domingo, horas 'HH:mm'.
--- (sin punto y coma en los comentarios: el esquema se separa en sentencias por ese carácter)
-CREATE TABLE IF NOT EXISTS horarios (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, materia_id BIGINT NOT NULL, dia INT NOT NULL,
-    inicio VARCHAR(5) NOT NULL, fin VARCHAR(5) NOT NULL,
-    INDEX ix_horarios_dia (dia),
-    FOREIGN KEY (materia_id) REFERENCES materias(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
--- En cada gestión el estudiante cursa UN semestre (y todas sus materias).
-CREATE TABLE IF NOT EXISTS inscripciones (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY, estudiante_id BIGINT NOT NULL, gestion_id BIGINT NOT NULL, semestre INT NOT NULL,
-    UNIQUE (estudiante_id, gestion_id), INDEX ix_inscripciones_gestion (gestion_id, semestre),
-    FOREIGN KEY (estudiante_id) REFERENCES estudiantes(id) ON DELETE CASCADE,
-    FOREIGN KEY (gestion_id) REFERENCES gestiones(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        // así una base vieja (por ejemplo importada de SQLite) y una nueva siguen el mismo camino.
+        static readonly string[] Esquema =
+        {
+            @"IF OBJECT_ID(N'estudiantes', N'U') IS NULL CREATE TABLE estudiantes (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, codigo NVARCHAR(30) NOT NULL UNIQUE, nombres NVARCHAR(60) NOT NULL,
+    apellidos NVARCHAR(60) NOT NULL DEFAULT N'', curso NVARCHAR(100) NOT NULL DEFAULT N'', activo INT NOT NULL DEFAULT 1,
+    creado FLOAT NOT NULL)",
+            // Cada fila es una muestra del rostro: el VECTOR de 128 números que calcula la red SFace
+            // (no se guarda la foto completa, solo un recorte chico de 112×112 para mostrarlo).
+            @"IF OBJECT_ID(N'rostros', N'U') IS NULL CREATE TABLE rostros (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, estudiante_id BIGINT NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+    vector VARBINARY(MAX) NOT NULL, foto VARBINARY(MAX) NULL, creado FLOAT NOT NULL)",
+            @"IF OBJECT_ID(N'asistencias', N'U') IS NULL CREATE TABLE asistencias (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, estudiante_id BIGINT NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+    fecha NVARCHAR(10) NOT NULL, hora FLOAT NOT NULL, estado NVARCHAR(20) NOT NULL, similitud FLOAT NOT NULL DEFAULT 0,
+    fuente NVARCHAR(20) NOT NULL DEFAULT N'camara', observacion NVARCHAR(120) NOT NULL DEFAULT N'',
+    UNIQUE (estudiante_id, fecha))",
+            @"IF OBJECT_ID(N'eventos', N'U') IS NULL CREATE TABLE eventos (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, estudiante_id BIGINT NULL, tipo NVARCHAR(40) NOT NULL, mensaje NVARCHAR(MAX) NOT NULL,
+    prioridad NVARCHAR(10) NOT NULL DEFAULT N'normal', fuente NVARCHAR(20) NOT NULL, atendido INT NOT NULL DEFAULT 0, creado FLOAT NOT NULL)",
+            // Periodos académicos: I-2026 (1ro, 3ro, 5to), II-2026 (2do, 4to, 6to). Solo una gestión está activa.
+            @"IF OBJECT_ID(N'gestiones', N'U') IS NULL CREATE TABLE gestiones (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, nombre NVARCHAR(20) NOT NULL UNIQUE,
+    inicio NVARCHAR(10) NOT NULL, fin NVARCHAR(10) NOT NULL, activa INT NOT NULL DEFAULT 0)",
+            // El PIN se guarda como sal:hash (PBKDF2), nunca en texto.
+            @"IF OBJECT_ID(N'docentes', N'U') IS NULL CREATE TABLE docentes (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, nombres NVARCHAR(60) NOT NULL, apellidos NVARCHAR(60) NOT NULL DEFAULT N'',
+    pin NVARCHAR(120) NOT NULL DEFAULT N'', activo INT NOT NULL DEFAULT 1, creado FLOAT NOT NULL)",
+            @"IF OBJECT_ID(N'materias', N'U') IS NULL CREATE TABLE materias (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, gestion_id BIGINT NOT NULL REFERENCES gestiones(id) ON DELETE CASCADE, semestre INT NOT NULL,
+    sigla NVARCHAR(20) NOT NULL DEFAULT N'', nombre NVARCHAR(100) NOT NULL,
+    docente_id BIGINT NULL REFERENCES docentes(id) ON DELETE SET NULL, tolerancia_min INT NOT NULL DEFAULT 10)",
+            // Horario semanal: dia 1 = lunes … 7 = domingo, horas 'HH:mm'.
+            @"IF OBJECT_ID(N'horarios', N'U') IS NULL CREATE TABLE horarios (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, materia_id BIGINT NOT NULL REFERENCES materias(id) ON DELETE CASCADE, dia INT NOT NULL,
+    inicio NVARCHAR(5) NOT NULL, fin NVARCHAR(5) NOT NULL)",
+            // En cada gestión el estudiante cursa UN semestre (y todas sus materias).
+            @"IF OBJECT_ID(N'inscripciones', N'U') IS NULL CREATE TABLE inscripciones (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, estudiante_id BIGINT NOT NULL REFERENCES estudiantes(id) ON DELETE CASCADE,
+    gestion_id BIGINT NOT NULL REFERENCES gestiones(id) ON DELETE CASCADE, semestre INT NOT NULL,
+    UNIQUE (estudiante_id, gestion_id))",
+            Indice("rostros", "ix_rostros_estudiante", "estudiante_id"),
+            Indice("asistencias", "ix_asistencias_fecha", "fecha"),
+            Indice("materias", "ix_materias_gestion", "gestion_id, semestre"),
+            Indice("horarios", "ix_horarios_dia", "dia"),
+            Indice("inscripciones", "ix_inscripciones_gestion", "gestion_id, semestre"),
+        };
+
+        static string Indice(string tabla, string nombre, string columnas, bool unico = false) =>
+            $"IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id = OBJECT_ID(N'{tabla}') AND name = N'{nombre}') " +
+            $"CREATE {(unico ? "UNIQUE " : "")}INDEX {nombre} ON {tabla} ({columnas})";
 
         readonly string _cadena;
         readonly ConfigBaseDatos _cfg;
@@ -96,11 +88,25 @@ CREATE TABLE IF NOT EXISTS inscripciones (
             _cadena = Cadena(cfg, conBase: true);
         }
 
-        static string Cadena(ConfigBaseDatos c, bool conBase) => new MySqlConnectionStringBuilder
+        /// <summary>Usuario vacío = autenticación de Windows. Puerto 0 = el de la instancia (memoria compartida si es local).</summary>
+        static string Cadena(ConfigBaseDatos c, bool conBase)
         {
-            Server = c.Servidor, Port = (uint)c.Puerto, UserID = c.Usuario, Password = c.Clave,
-            Database = conBase ? c.Nombre : "", CharacterSet = "utf8mb4", ConnectionTimeout = 5,
-        }.ToString();
+            var b = new SqlConnectionStringBuilder
+            {
+                DataSource = c.Puerto > 0 ? $"{c.Servidor},{c.Puerto}" : c.Servidor,
+                InitialCatalog = conBase ? c.Nombre : "master",
+                ConnectTimeout = 5,
+                Encrypt = SqlConnectionEncryptOption.Optional,      // red local: SQL Server 2014 trae certificado propio
+                TrustServerCertificate = true,
+                ApplicationName = "AsistenciaFacial",
+            };
+            if (string.IsNullOrWhiteSpace(c.Usuario)) b.IntegratedSecurity = true;
+            else { b.UserID = c.Usuario; b.Password = c.Clave ?? ""; }
+            return b.ToString();
+        }
+
+        string Destino => $"{_cfg.Servidor}{(_cfg.Puerto > 0 ? "," + _cfg.Puerto : "")} (base «{_cfg.Nombre}», " +
+                          (string.IsNullOrWhiteSpace(_cfg.Usuario) ? "autenticación de Windows" : $"usuario «{_cfg.Usuario}»") + ")";
 
         public static double Ahora() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds() / 1000.0;
         public static string Hoy() => DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
@@ -113,17 +119,22 @@ CREATE TABLE IF NOT EXISTS inscripciones (
         // ───────────────────────── sesión (conexión + transacción) ─────────────────────────
         sealed class Sesion : IDisposable
         {
-            public MySqlConnection Con;
-            public MySqlTransaction Tx;
+            public SqlConnection Con;
+            public SqlTransaction Tx;
 
-            public MySqlCommand Cmd(string sql, object p = null)
+            public SqlCommand Cmd(string sql, object p = null)
             {
                 var c = Con.CreateCommand();
                 c.CommandText = sql;
                 c.Transaction = Tx;
                 if (p != null)
                     foreach (var prop in p.GetType().GetProperties())
-                        c.Parameters.AddWithValue("@" + prop.Name, prop.GetValue(p) ?? DBNull.Value);
+                    {
+                        object v = prop.GetValue(p);
+                        var par = c.Parameters.AddWithValue("@" + prop.Name, v ?? DBNull.Value);
+                        // Un NULL sin tipo llega como NVARCHAR, y SQL Server no lo convierte solo a VARBINARY.
+                        if (v == null) par.SqlDbType = TipoSql(prop.PropertyType);
+                    }
                 return c;
             }
 
@@ -140,7 +151,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 return v == null || v is DBNull ? 0 : Convert.ToDouble(v, CultureInfo.InvariantCulture);
             }
 
-            public List<T> Consultar<T>(string sql, Func<MySqlDataReader, T> mapa, object p = null)
+            public List<T> Consultar<T>(string sql, Func<SqlDataReader, T> mapa, object p = null)
             {
                 using var c = Cmd(sql, p);
                 using var r = c.ExecuteReader();
@@ -149,7 +160,12 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 return lista;
             }
 
-            public long UltimoId() => (long)Numero("SELECT LAST_INSERT_ID()");
+            /// <summary>INSERT que devuelve el id nuevo (SCOPE_IDENTITY solo vale dentro del mismo lote).</summary>
+            public long Insertar(string sql, object p = null)
+            {
+                using var c = Cmd(sql + "; SELECT CAST(SCOPE_IDENTITY() AS BIGINT)", p);
+                return Convert.ToInt64(c.ExecuteScalar(), CultureInfo.InvariantCulture);
+            }
 
             public void Dispose()
             {
@@ -158,11 +174,18 @@ CREATE TABLE IF NOT EXISTS inscripciones (
             }
         }
 
+        static SqlDbType TipoSql(Type t)
+        {
+            t = Nullable.GetUnderlyingType(t) ?? t;
+            return t == typeof(byte[]) ? SqlDbType.VarBinary : t == typeof(long) ? SqlDbType.BigInt : t == typeof(int) ? SqlDbType.Int
+                 : t == typeof(double) ? SqlDbType.Float : t == typeof(bool) ? SqlDbType.Bit : SqlDbType.NVarChar;
+        }
+
         T Operacion<T>(Func<Sesion, T> f)
         {
             lock (_candado)
             {
-                var con = new MySqlConnection(_cadena);
+                var con = new SqlConnection(_cadena);
                 con.Open();
                 using var s = new Sesion { Con = con };
                 s.Tx = con.BeginTransaction();
@@ -174,12 +197,12 @@ CREATE TABLE IF NOT EXISTS inscripciones (
 
         void Operacion(Action<Sesion> f) => Operacion<bool>(s => { f(s); return true; });
 
-        /// <summary>CREATE/ALTER confirman solos en MariaDB: van fuera de cualquier transacción.</summary>
+        /// <summary>CREATE/ALTER: cada uno por separado, fuera de las transacciones de datos.</summary>
         void Ddl(string sql)
         {
             lock (_candado)
             {
-                using var con = new MySqlConnection(_cadena);
+                using var con = new SqlConnection(_cadena);
                 con.Open();
                 using var c = con.CreateCommand();
                 c.CommandText = sql;
@@ -187,42 +210,42 @@ CREATE TABLE IF NOT EXISTS inscripciones (
             }
         }
 
-        static int Col(MySqlDataReader r, string c) => r.GetOrdinal(c);
-        // Convert: en MariaDB COUNT() da BIGINT pero SUM() da DECIMAL y las columnas INT dan int
-        static long L(MySqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? 0 : Convert.ToInt64(r.GetValue(Col(r, c)), CultureInfo.InvariantCulture);
-        static long? LN(MySqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? (long?)null : L(r, c);
-        static double D(MySqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? 0 : r.GetDouble(Col(r, c));
-        static double? DN(MySqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? (double?)null : r.GetDouble(Col(r, c));
-        static string S(MySqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? "" : r.GetString(Col(r, c));
-        static byte[] B(MySqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? null : (byte[])r.GetValue(Col(r, c));
+        static int Col(SqlDataReader r, string c) => r.GetOrdinal(c);
+        // Convert: COUNT() y SUM() dan INT, las columnas id son BIGINT
+        static long L(SqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? 0 : Convert.ToInt64(r.GetValue(Col(r, c)), CultureInfo.InvariantCulture);
+        static long? LN(SqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? (long?)null : L(r, c);
+        static double D(SqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? 0 : Convert.ToDouble(r.GetValue(Col(r, c)), CultureInfo.InvariantCulture);
+        static double? DN(SqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? (double?)null : D(r, c);
+        static string S(SqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? "" : r.GetString(Col(r, c));
+        static byte[] B(SqlDataReader r, string c) => r.IsDBNull(Col(r, c)) ? null : (byte[])r.GetValue(Col(r, c));
 
-        static Estudiante MapaEstudiante(MySqlDataReader r) => new Estudiante
+        static Estudiante MapaEstudiante(SqlDataReader r) => new Estudiante
         {
             Id = L(r, "id"), Codigo = S(r, "codigo"), Nombres = S(r, "nombres"), Apellidos = S(r, "apellidos"),
             Curso = S(r, "curso"), Activo = L(r, "activo") == 1, Muestras = (int)L(r, "muestras"), Semestre = (int)L(r, "semestre"),
             Creado = D(r, "creado"),
         };
 
-        static Evento MapaEvento(MySqlDataReader r) => new Evento
+        static Evento MapaEvento(SqlDataReader r) => new Evento
         {
             Id = L(r, "id"), EstudianteId = LN(r, "estudiante_id"),
             Tipo = S(r, "tipo"), Mensaje = S(r, "mensaje"), Prioridad = S(r, "prioridad"), Fuente = S(r, "fuente"),
             Atendido = L(r, "atendido") == 1, Creado = D(r, "creado"),
         };
 
-        static Gestion MapaGestion(MySqlDataReader r) => new Gestion
+        static Gestion MapaGestion(SqlDataReader r) => new Gestion
         {
             Id = L(r, "id"), Nombre = S(r, "nombre"), Inicio = S(r, "inicio"), Fin = S(r, "fin"), Activa = L(r, "activa") == 1,
             Materias = (int)L(r, "materias"), Inscritos = (int)L(r, "inscritos"),
         };
 
-        static Docente MapaDocente(MySqlDataReader r) => new Docente
+        static Docente MapaDocente(SqlDataReader r) => new Docente
         {
             Id = L(r, "id"), Nombres = S(r, "nombres"), Apellidos = S(r, "apellidos"), Activo = L(r, "activo") == 1,
             TienePin = S(r, "pin").Length > 0, Materias = (int)L(r, "materias"),
         };
 
-        static Materia MapaMateria(MySqlDataReader r) => new Materia
+        static Materia MapaMateria(SqlDataReader r) => new Materia
         {
             Id = L(r, "id"), GestionId = L(r, "gestion_id"), Gestion = S(r, "gestion"), Semestre = (int)L(r, "semestre"),
             Sigla = S(r, "sigla"), Nombre = S(r, "nombre"), DocenteId = LN(r, "docente_id"), Docente = S(r, "docente").Trim(),
@@ -258,36 +281,38 @@ CREATE TABLE IF NOT EXISTS inscripciones (
             {
                 lock (_candado)
                 {
-                    using (var con = new MySqlConnection(Cadena(_cfg, conBase: false)))
+                    using (var con = new SqlConnection(Cadena(_cfg, conBase: false)))
                     {
                         con.Open();
                         using var c = con.CreateCommand();
-                        c.CommandText = $"CREATE DATABASE IF NOT EXISTS `{_cfg.Nombre.Replace("`", "")}` " +
-                                        "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci";
+                        c.CommandText = "IF DB_ID(@n) IS NULL BEGIN DECLARE @sql NVARCHAR(400) = N'CREATE DATABASE ' + QUOTENAME(@n); EXEC (@sql); END";
+                        c.Parameters.AddWithValue("@n", _cfg.Nombre);
                         c.ExecuteNonQuery();
                     }
                 }
             }
-            catch (MySqlException e)
+            catch (SqlException e)
             {
-                throw new ErrorValidacion($"No se pudo conectar a MariaDB en {_cfg.Servidor}:{_cfg.Puerto} (base «{_cfg.Nombre}», usuario «{_cfg.Usuario}»).\n\n" +
-                    "Abre el Panel de control de XAMPP e inicia «MySQL», o revisa la sección base_de_datos de config.json.\n\n" + e.Message);
+                throw new ErrorValidacion($"No se pudo conectar a SQL Server en {Destino}.\n\n" +
+                    "Revisa que el servicio «SQL Server (MSSQLSERVER)» esté iniciado (services.msc o SQL Server Configuration Manager), " +
+                    "o la sección base_de_datos de config.json.\n\n" + e.Message);
             }
             try
             {
-                foreach (string sql in Esquema.Split(';').Select(x => x.Trim()).Where(x => x.Length > 0))
-                    Ddl(sql);
+                foreach (string sql in Esquema) Ddl(sql);
             }
-            catch (MySqlException e) { throw new ErrorValidacion("No se pudieron crear las tablas de la base de datos.\n\n" + e.Message); }
+            catch (SqlException e) { throw new ErrorValidacion("No se pudieron crear las tablas de la base de datos.\n\n" + e.Message); }
             if (!EsquemaActualizado() && sqliteAnterior != null && File.Exists(sqliteAnterior)) MigrarDesdeSqlite(sqliteAnterior);
             try { ActualizarEsquema(legado); }
-            catch (MySqlException e) { throw new ErrorValidacion("No se pudo actualizar la base de datos a materias por semestre.\n\n" + e.Message); }
+            catch (SqlException e) { throw new ErrorValidacion("No se pudo actualizar la base de datos a materias por semestre.\n\n" + e.Message); }
         }
 
         // ───────────────────────── actualización: una materia → materias por semestre ─────────────────────────
         bool EsquemaActualizado() => Operacion(s => s.Numero(
-            "SELECT COUNT(*) FROM information_schema.REFERENTIAL_CONSTRAINTS " +
-            "WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME = 'fk_asistencia_materia'") > 0);
+            "SELECT COUNT(*) FROM sys.foreign_keys WHERE name = N'fk_asistencia_materia' AND parent_object_id = OBJECT_ID(N'asistencias')") > 0);
+
+        static string AgregarColumna(string tabla, string columna, string tipo) =>
+            $"IF COL_LENGTH(N'{tabla}', N'{columna}') IS NULL ALTER TABLE {tabla} ADD {columna} {tipo}";
 
         /// <summary>
         /// La versión anterior tenía una sola materia (en config.json) y una marca por día.
@@ -298,24 +323,31 @@ CREATE TABLE IF NOT EXISTS inscripciones (
         {
             if (!EsquemaActualizado()) AMaterias(legado);
             // Entrada y salida: la columna «hora» es la entrada; la salida se agregó después.
-            Ddl("ALTER TABLE asistencias ADD COLUMN IF NOT EXISTS hora_salida DOUBLE NULL AFTER hora, " +
-                "ADD COLUMN IF NOT EXISTS similitud_salida DOUBLE NULL AFTER hora_salida, " +
-                "ADD COLUMN IF NOT EXISTS fuente_salida VARCHAR(20) NULL AFTER similitud_salida");
+            Ddl(AgregarColumna("asistencias", "hora_salida", "FLOAT NULL"));
+            Ddl(AgregarColumna("asistencias", "similitud_salida", "FLOAT NULL"));
+            Ddl(AgregarColumna("asistencias", "fuente_salida", "NVARCHAR(20) NULL"));
         }
 
         void AMaterias(Configuracion legado)
         {
-            Ddl("ALTER TABLE asistencias ADD COLUMN IF NOT EXISTS materia_id BIGINT NULL AFTER estudiante_id");
+            Ddl(AgregarColumna("asistencias", "materia_id", "BIGINT NULL"));
             Operacion(s => Sembrar(s, legado));
-            Ddl("ALTER TABLE asistencias MODIFY materia_id BIGINT NOT NULL");
-            Ddl("ALTER TABLE asistencias ADD UNIQUE INDEX IF NOT EXISTS ux_asistencia (estudiante_id, materia_id, fecha)");
-            string viejo = Operacion(s => s.Consultar(
-                "SELECT INDEX_NAME AS n FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'asistencias' " +
-                "AND NON_UNIQUE = 0 GROUP BY INDEX_NAME HAVING GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) = 'estudiante_id,fecha'",
-                r => S(r, "n")).FirstOrDefault());
-            if (viejo != null) Ddl($"ALTER TABLE asistencias DROP INDEX `{viejo.Replace("`", "")}`");
-            Ddl("ALTER TABLE asistencias ADD CONSTRAINT fk_asistencia_materia FOREIGN KEY IF NOT EXISTS (materia_id) " +
-                "REFERENCES materias(id) ON DELETE CASCADE");
+            Ddl("IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'asistencias') AND name = N'materia_id' AND is_nullable = 1) " +
+                "ALTER TABLE asistencias ALTER COLUMN materia_id BIGINT NOT NULL");
+            Ddl(Indice("asistencias", "ux_asistencia", "estudiante_id, materia_id, fecha", unico: true));
+            // El UNIQUE (estudiante_id, fecha) original: una restricción con nombre automático.
+            var viejo = Operacion(s => s.Consultar(
+                "SELECT i.name, i.is_unique_constraint, c.name AS col FROM sys.indexes i " +
+                "JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id " +
+                "JOIN sys.columns c ON c.object_id = i.object_id AND c.column_id = ic.column_id " +
+                "WHERE i.object_id = OBJECT_ID(N'asistencias') AND i.is_unique = 1 AND i.is_primary_key = 0 ORDER BY i.name, ic.key_ordinal",
+                r => (nombre: S(r, "name"), restriccion: r.GetBoolean(1), col: S(r, "col"))))
+                .GroupBy(x => (x.nombre, x.restriccion))
+                .FirstOrDefault(g => string.Join(",", g.Select(x => x.col)) == "estudiante_id,fecha");
+            if (viejo != null)
+                Ddl(viejo.Key.restriccion ? $"ALTER TABLE asistencias DROP CONSTRAINT [{viejo.Key.nombre}]" : $"DROP INDEX [{viejo.Key.nombre}] ON asistencias");
+            Ddl("IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = N'fk_asistencia_materia') " +
+                "ALTER TABLE asistencias ADD CONSTRAINT fk_asistencia_materia FOREIGN KEY (materia_id) REFERENCES materias(id) ON DELETE CASCADE");
         }
 
         /// <summary>Crea la gestión actual y, con los datos de config.json, la materia, su docente y su horario.</summary>
@@ -341,9 +373,8 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 if (nombreDocente.Length > 0)
                 {
                     // Mismo PIN que el administrador: conviene cambiarlo en «Académico → Docentes».
-                    s.Ejecutar("INSERT INTO docentes (nombres, apellidos, pin, activo, creado) VALUES (@nombres, '', @pin, 1, @creado)",
+                    docente = s.Insertar("INSERT INTO docentes (nombres, apellidos, pin, activo, creado) VALUES (@nombres, '', @pin, 1, @creado)",
                         new { nombres = Recortar(nombreDocente, 60), pin = HashPin(legado.PinAdmin ?? "1234"), creado = Ahora() });
-                    docente = s.UltimoId();
                 }
                 // "IAR-600 Inteligencia Artificial y Robótica" → sigla IAR-600 + nombre
                 var m = Regex.Match(nombre, @"^([A-ZÑ]{2,6}-?\d{2,4})\s+(.+)$");
@@ -353,12 +384,12 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 var h = legado?.Horario ?? new ConfigHorario();
                 string inicio = Academico.HoraValida(h.HoraEntrada) ? h.HoraEntrada : "08:00";
                 string fin = Academico.HoraValida(h.HoraCierre) && Academico.Hora(h.HoraCierre) > Academico.Hora(inicio) ? h.HoraCierre : "13:00";
-                s.Ejecutar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@gestion, @semestre, @sigla, @titulo, @docente, @tol)",
+                long materia = s.Insertar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@gestion, @semestre, @sigla, @titulo, @docente, @tol)",
                     new { gestion, semestre, sigla, titulo = Recortar(titulo, 100), docente, tol = Math.Max(0, Math.Min(120, h.ToleranciaMin)) });
-                long materia = s.UltimoId();
                 for (int dia = 1; dia <= 5; dia++)        // lunes a viernes con el horario de siempre: se ajusta en «Académico»
                     s.Ejecutar("INSERT INTO horarios (materia_id, dia, inicio, fin) VALUES (@materia, @dia, @inicio, @fin)", new { materia, dia, inicio, fin });
-                s.Ejecutar("INSERT IGNORE INTO inscripciones (estudiante_id, gestion_id, semestre) SELECT id, @gestion, @semestre FROM estudiantes",
+                s.Ejecutar("INSERT INTO inscripciones (estudiante_id, gestion_id, semestre) SELECT e.id, @gestion, @semestre FROM estudiantes e " +
+                           "WHERE NOT EXISTS (SELECT 1 FROM inscripciones x WHERE x.estudiante_id = e.id AND x.gestion_id = @gestion)",
                     new { gestion, semestre });
                 RegistrarEvento(s, null, "actualizacion",
                     $"Base actualizada a materias por semestre: «{titulo}» quedó en {Academico.Semestre(semestre)} semestre de la gestión activa " +
@@ -405,14 +436,14 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                     };
                 });
             }
-            catch (Exception e) when (e is MySqlException || e is SqliteException)
+            catch (Exception e) when (e is SqlException || e is SqliteException)
             {
-                throw new ErrorValidacion($"No se pudieron importar los datos de {ruta} a MariaDB. No se cambió nada: el archivo sigue intacto.\n\n{e.Message}");
+                throw new ErrorValidacion($"No se pudieron importar los datos de {ruta} a SQL Server. No se cambió nada: el archivo sigue intacto.\n\n{e.Message}");
             }
             File.Move(ruta, ruta + ".migrado", overwrite: true);
             foreach (var extra in new[] { "-wal", "-shm" })              // archivos auxiliares de SQLite, si quedaron
                 if (File.Exists(ruta + extra)) File.Move(ruta + extra, ruta + ".migrado" + extra, overwrite: true);
-            EventoSistema("migracion", $"Datos importados de SQLite a MariaDB: {copiados[0]} estudiantes, {copiados[1]} muestras de rostro, " +
+            EventoSistema("migracion", $"Datos importados de SQLite a SQL Server: {copiados[0]} estudiantes, {copiados[1]} muestras de rostro, " +
                                        $"{copiados[2]} asistencias y {copiados[3]} eventos (el archivo viejo quedó como {Path.GetFileName(ruta)}.migrado)", false);
             VersionRostros++;
         }
@@ -420,6 +451,11 @@ CREATE TABLE IF NOT EXISTS inscripciones (
         static int Copiar(SqliteConnection origen, Sesion s, string tabla, string columnas)
         {
             var cols = columnas.Split(',').Select(x => x.Trim()).ToArray();
+            // tipo de cada columna destino: un NULL debe ir con su tipo (VARBINARY no acepta un NULL de texto)
+            var tipos = s.Consultar("SELECT name, TYPE_NAME(system_type_id) AS tipo FROM sys.columns WHERE object_id = OBJECT_ID(@tabla)",
+                r => (S(r, "name"), S(r, "tipo")), new { tabla }).ToDictionary(x => x.Item1, x => x.Item2, StringComparer.OrdinalIgnoreCase);
+            bool conId = cols.Contains("id");
+            if (conId) s.Ejecutar($"SET IDENTITY_INSERT {tabla} ON");
             using var leer = origen.CreateCommand();
             leer.CommandText = $"SELECT {columnas} FROM {tabla} ORDER BY id";
             using var r = leer.ExecuteReader();
@@ -428,10 +464,15 @@ CREATE TABLE IF NOT EXISTS inscripciones (
             while (r.Read())
             {
                 ins.Parameters.Clear();
-                for (int i = 0; i < cols.Length; i++) ins.Parameters.AddWithValue("@" + cols[i], r.GetValue(i));
+                for (int i = 0; i < cols.Length; i++)
+                {
+                    var par = ins.Parameters.AddWithValue("@" + cols[i], r.GetValue(i));
+                    if (r.IsDBNull(i) && tipos.TryGetValue(cols[i], out var t) && t == "varbinary") par.SqlDbType = SqlDbType.VarBinary;
+                }
                 ins.ExecuteNonQuery();
                 n++;
             }
+            if (conId) s.Ejecutar($"SET IDENTITY_INSERT {tabla} OFF");
             return n;
         }
 
@@ -469,8 +510,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 }
                 // la primera gestión que se crea queda activa
                 bool primera = s.Numero("SELECT COUNT(*) FROM gestiones") == 0;
-                s.Ejecutar("INSERT INTO gestiones (nombre, inicio, fin, activa) VALUES (@nombre, @inicio, @fin, " + (primera ? "1" : "0") + ")", v);
-                return s.UltimoId();
+                return s.Insertar("INSERT INTO gestiones (nombre, inicio, fin, activa) VALUES (@nombre, @inicio, @fin, " + (primera ? "1" : "0") + ")", v);
             });
         }
 
@@ -479,7 +519,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
         {
             var g = s.Consultar(SqlGestiones + "WHERE g.id = @id", MapaGestion, new { id }).FirstOrDefault()
                     ?? throw new ErrorValidacion("La gestión no existe");
-            s.Ejecutar("UPDATE gestiones SET activa = (id = @id)", new { id });
+            s.Ejecutar("UPDATE gestiones SET activa = CASE WHEN id = @id THEN 1 ELSE 0 END", new { id });
             RegistrarEvento(s, null, "gestion", $"Gestión activa: {g.Nombre}", "normal", "admin");
         });
 
@@ -504,9 +544,8 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 int n = 0;
                 foreach (var m in materias.Where(m => !existentes.Any(x => x.Semestre == m.Semestre && x.Nombre == m.Nombre)))
                 {
-                    s.Ejecutar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@destino, @semestre, @sigla, @nombre, @docente, @tol)",
+                    long id = s.Insertar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@destino, @semestre, @sigla, @nombre, @docente, @tol)",
                         new { destino, semestre = m.Semestre, sigla = m.Sigla, nombre = m.Nombre, docente = m.DocenteId, tol = m.ToleranciaMin });
-                    long id = s.UltimoId();
                     foreach (var b in m.Horarios)
                         s.Ejecutar("INSERT INTO horarios (materia_id, dia, inicio, fin) VALUES (@id, @dia, @inicio, @fin)", new { id, dia = b.Dia, inicio = b.Inicio, fin = b.Fin });
                     n++;
@@ -523,9 +562,11 @@ CREATE TABLE IF NOT EXISTS inscripciones (
         {
             if (origen == destino) throw new ErrorValidacion("Elige una gestión distinta");
             return Operacion(s => s.Ejecutar(
-                "INSERT IGNORE INTO inscripciones (estudiante_id, gestion_id, semestre) " +
+                "INSERT INTO inscripciones (estudiante_id, gestion_id, semestre) " +
                 "SELECT i.estudiante_id, @destino, i.semestre + 1 FROM inscripciones i JOIN estudiantes e ON e.id = i.estudiante_id " +
-                "WHERE i.gestion_id = @origen AND i.semestre < 6 AND e.activo = 1", new { origen, destino }));
+                "WHERE i.gestion_id = @origen AND i.semestre < 6 AND e.activo = 1 " +
+                "AND NOT EXISTS (SELECT 1 FROM inscripciones x WHERE x.estudiante_id = i.estudiante_id AND x.gestion_id = @destino)",
+                new { origen, destino }));
         }
 
         // ───────────────────────── docentes ─────────────────────────
@@ -550,8 +591,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                                (pinNuevo.Length > 0 ? ", pin = @pin" : "") + " WHERE id = @id", v);
                     return d.Id;
                 }
-                s.Ejecutar("INSERT INTO docentes (nombres, apellidos, pin, activo, creado) VALUES (@nombres, @apellidos, @pin, @activo, @creado)", v);
-                return s.UltimoId();
+                return s.Insertar("INSERT INTO docentes (nombres, apellidos, pin, activo, creado) VALUES (@nombres, @apellidos, @pin, @activo, @creado)", v);
             });
         }
 
@@ -647,8 +687,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                                "tolerancia_min = @tol WHERE id = @id", v);
                 else
                 {
-                    s.Ejecutar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@gestion, @semestre, @sigla, @nombre, @docente, @tol)", v);
-                    id = s.UltimoId();
+                    id = s.Insertar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@gestion, @semestre, @sigla, @nombre, @docente, @tol)", v);
                 }
                 s.Ejecutar("DELETE FROM horarios WHERE materia_id = @id", new { id });
                 foreach (var b in bloques.OrderBy(b => b.Dia).ThenBy(b => b.HoraInicio))
@@ -719,16 +758,16 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                     s.Ejecutar("UPDATE estudiantes SET codigo=@codigo, nombres=@nombres, apellidos=@apellidos, curso=@curso, activo=@activo WHERE id=@id", v);
                 else
                 {
-                    s.Ejecutar("INSERT INTO estudiantes (codigo, nombres, apellidos, curso, activo, creado) VALUES (@codigo, @nombres, @apellidos, @curso, @activo, @creado)", v);
-                    id = s.UltimoId();
+                    id = s.Insertar("INSERT INTO estudiantes (codigo, nombres, apellidos, curso, activo, creado) VALUES (@codigo, @nombres, @apellidos, @curso, @activo, @creado)", v);
                 }
                 if (conSemestre)
                 {
                     long gestion = GestionActivaId(s);
                     if (gestion == 0 && e.Semestre > 0) throw new ErrorValidacion("No hay gestión activa: créala en «Académico» para inscribir estudiantes");
                     if (e.Semestre == 0) s.Ejecutar("DELETE FROM inscripciones WHERE estudiante_id = @id AND gestion_id = @gestion", new { id, gestion });
-                    else s.Ejecutar("INSERT INTO inscripciones (estudiante_id, gestion_id, semestre) VALUES (@id, @gestion, @semestre) " +
-                                    "ON DUPLICATE KEY UPDATE semestre = @semestre", new { id, gestion, semestre = e.Semestre });
+                    else s.Ejecutar("UPDATE inscripciones SET semestre = @semestre WHERE estudiante_id = @id AND gestion_id = @gestion; " +
+                                    "IF @@ROWCOUNT = 0 INSERT INTO inscripciones (estudiante_id, gestion_id, semestre) VALUES (@id, @gestion, @semestre)",
+                                    new { id, gestion, semestre = e.Semestre });
                 }
                 return id;
             });
@@ -830,7 +869,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                         AVector(B(r, "vector"))), new { estudianteId }));
 
         public byte[] Foto(long estudianteId) => Operacion(s =>
-            s.Consultar("SELECT foto FROM rostros WHERE estudiante_id=@estudianteId AND foto IS NOT NULL ORDER BY id LIMIT 1",
+            s.Consultar("SELECT TOP 1 foto FROM rostros WHERE estudiante_id=@estudianteId AND foto IS NOT NULL ORDER BY id",
                 r => B(r, "foto"), new { estudianteId }).FirstOrDefault());
 
         // ───────────────────────── marcas de asistencia ─────────────────────────
@@ -844,7 +883,7 @@ CREATE TABLE IF NOT EXISTS inscripciones (
             "LEFT JOIN inscripciones i ON i.estudiante_id = e.id AND i.gestion_id = m.gestion_id " +
             "LEFT JOIN asistencias a ON a.estudiante_id = e.id AND a.materia_id = m.id AND a.fecha = @fecha ";
 
-        static FilaAsistencia MapaFila(MySqlDataReader r) => new FilaAsistencia
+        static FilaAsistencia MapaFila(SqlDataReader r) => new FilaAsistencia
         {
             EstudianteId = L(r, "estudiante_id"), Codigo = S(r, "codigo"),
             Nombre = (S(r, "apellidos") + " " + S(r, "nombres")).Trim(), Curso = S(r, "curso"), Muestras = (int)L(r, "muestras"),
@@ -994,14 +1033,14 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                 Lista = lista,
                 Resumen = Resumir(fecha, lista),
                 Eventos = desdeEvento > 0
-                    ? s.Consultar("SELECT * FROM eventos WHERE id>@desdeEvento ORDER BY id LIMIT 100", MapaEvento, new { desdeEvento })
-                    : s.Consultar("SELECT * FROM eventos ORDER BY id DESC LIMIT 40", MapaEvento).AsEnumerable().Reverse().ToList(),
+                    ? s.Consultar("SELECT TOP 100 * FROM eventos WHERE id>@desdeEvento ORDER BY id", MapaEvento, new { desdeEvento })
+                    : s.Consultar("SELECT TOP 40 * FROM eventos ORDER BY id DESC", MapaEvento).AsEnumerable().Reverse().ToList(),
                 UltimoEvento = (long)s.Numero("SELECT COALESCE(MAX(id),0) FROM eventos"),
             });
         }
 
         public List<Evento> UltimosEventos(int n = 300) => Operacion(s =>
-            s.Consultar("SELECT * FROM eventos ORDER BY id DESC LIMIT @n", MapaEvento, new { n }));
+            s.Consultar("SELECT TOP (@n) * FROM eventos ORDER BY id DESC", MapaEvento, new { n }));
 
         public void AtenderTodos() => Operacion(s => s.Ejecutar("UPDATE eventos SET atendido=1 WHERE atendido=0"));
 
@@ -1071,11 +1110,11 @@ CREATE TABLE IF NOT EXISTS inscripciones (
                     }, v);
                 // cada clase dictada (día en que alguien marcó en la materia) y lo que hizo este estudiante
                 var dias = s.Consultar(
-                    "SELECT x.fecha, m.id AS materia_id, m.sigla, m.nombre AS materia, a.hora, a.hora_salida, a.estado, a.observacion " +
+                    "SELECT TOP 200 x.fecha, m.id AS materia_id, m.sigla, m.nombre AS materia, a.hora, a.hora_salida, a.estado, a.observacion " +
                     "FROM (SELECT DISTINCT materia_id, fecha FROM asistencias WHERE fecha BETWEEN @desde AND @hasta) x " +
                     "JOIN materias m ON m.id = x.materia_id AND m.gestion_id = @g AND m.semestre = @sem " +
                     "LEFT JOIN asistencias a ON a.materia_id = x.materia_id AND a.fecha = x.fecha AND a.estudiante_id = @est " +
-                    "ORDER BY x.fecha DESC, m.nombre LIMIT 200",
+                    "ORDER BY x.fecha DESC, m.nombre",
                     r => new FilaAsistencia
                     {
                         EstudianteId = e.Id, Codigo = e.Codigo, Nombre = e.NombreCompleto, Fecha = S(r, "fecha"),
