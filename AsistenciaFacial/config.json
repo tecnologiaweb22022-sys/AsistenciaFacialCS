@@ -1,0 +1,39 @@
+{
+  "institucion": "I.T. Escuela Industrial Superior Pedro Domingo Murillo",
+  "curso": "Informática Industrial - Sexto semestre",
+  "materia": "IAR-600 Inteligencia Artificial y Robótica",
+  "docente": "Lic. Erik Huallpa Aruquipa",
+  "puerto": 5000,
+  "pin_admin": "1234",
+  "ip_para_qr": "",
+  "wifi_nombre": "Aula",
+  "wifi_clave": "",
+  "lista_publica": true,
+  "marcar_desde_celular": true,
+  "celular_pide_codigo": true,
+  "horario": {
+    "hora_entrada": "08:00",
+    "tolerancia_min": 10,
+    "hora_cierre": "13:00"
+  },
+  "reconocimiento": {
+    "fuente": "0",
+    "iniciar_automatico": true,
+    "ancho_proceso": 800,
+    "umbral_similitud": 0.42,
+    "margen_minimo": 0.05,
+    "confirmaciones": 3,
+    "rostro_minimo_px": 60,
+    "muestras_registro": 8,
+    "segundos_desconocido": 4,
+    "video_fps": 5,
+    "calidad_jpeg": 70
+  },
+  "base_de_datos": {
+    "servidor": "localhost",
+    "puerto": 3306,
+    "nombre": "asistencia",
+    "usuario": "root",
+    "clave": ""
+  }
+}

@@ -1,0 +1,7 @@
+bin/
+obj/
+.vs/
+publicado/
+*.user
+AsistenciaFacial/datos/
+AsistenciaFacial/zonas.json

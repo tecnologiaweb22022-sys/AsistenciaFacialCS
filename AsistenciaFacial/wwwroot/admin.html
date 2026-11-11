@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Panel de asistencia · {{INSTITUCION}}</title>
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+  .barra a{color:#fff;text-decoration:none} .barra .der{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .barra button{padding:.35em .8em;font-size:.85rem;background:rgba(255,255,255,.14)} .barra button.on{background:var(--verde)}
+  nav{display:flex;gap:4px;padding:10px 20px 0;flex-wrap:wrap}
+  nav button{background:transparent;color:var(--suave);border-radius:10px 10px 0 0;padding:.6em 1em}
+  nav button.activo{background:var(--papel);color:var(--tinta);border:1px solid var(--linea);border-bottom-color:var(--papel)}
+  .vista{display:none;padding:16px 20px 30px} .vista.activa{display:block}
+  .chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .chip{padding:10px 14px;min-width:110px} .chip b{display:block;font-size:1.4rem} .chip small{color:var(--suave)}
+  .panel{padding:14px} h3{margin:0 0 10px;font-size:1rem}
+  .fila-ctl{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px} .fila-ctl input,.fila-ctl select{width:auto}
+  table{width:100%;border-collapse:collapse;font-size:.9rem} th,td{padding:7px 8px;border-bottom:1px solid var(--linea);text-align:left;vertical-align:middle}
+  th{background:var(--tinta);color:#fff;position:sticky;top:0} .tabla{max-height:65vh;overflow:auto;border-radius:10px}
+  td .acc{display:flex;gap:4px;flex-wrap:wrap} td .acc button{font-size:.75rem;padding:.3em .55em}
+  .foto{width:38px;height:38px;border-radius:8px;object-fit:cover;background:var(--linea);display:block}
+  .feed{max-height:70vh;overflow:auto;display:flex;flex-direction:column;gap:6px}
+  .ev{padding:8px 10px;border-radius:10px;background:#fff;border:1px solid var(--linea);font-size:.88rem}
+  .ev.alta{border-left:5px solid var(--rojo)} .ev time{color:var(--suave);font-size:.75rem;margin-right:6px}
+  .camara img{width:100%;max-width:900px;border-radius:10px;background:#000;display:block;min-height:140px}
+  .toasts{position:fixed;top:70px;right:16px;display:flex;flex-direction:column;gap:8px;z-index:20;max-width:360px}
+  .toast{background:var(--tinta);color:#fff;padding:12px 14px;border-radius:12px;box-shadow:var(--sombra);border-left:6px solid var(--verde);font-weight:600;cursor:pointer}
+  .toast.alta{border-left-color:var(--rojo)}
+  .form{display:grid;grid-template-columns:1fr 1.4fr 1.4fr 1fr 1fr auto;gap:8px;margin-top:12px}
+  @media(max-width:700px){.form{grid-template-columns:1fr 1fr}}
+</style></head>
+<body>
+<div class="barra">
+  <div class="marca">{{USUARIO}}<small>Panel de asistencia · Gestión {{GESTION}}</small></div>
+  <div class="der">
+    <span class="pildora"><span class="punto" id="ptCam"></span><span id="txtCam">Cámara…</span></span>
+    <button id="btnSonido" onclick="activarSonido()">🔇 Activar sonido</button>
+    <a href="/admin/qr" target="_blank"><button>Cartel QR</button></a>
+    <a href="/" target="_blank"><button>Vista pública</button></a>
+    <a href="/logout"><button>Salir</button></a>
+  </div>
+</div>
+<nav>
+  <button class="activo" data-v="hoy">Asistencia</button>
+  <button data-v="alertas">Alertas</button>
+  <button data-v="estudiantes" id="tabEst" hidden>Estudiantes</button>
+  <button data-v="reportes">Reportes</button>
+  <button data-v="camara">Cámara</button>
+</nav>
+<div class="toasts" id="toasts"></div>
+
+<section class="vista activa" id="v-hoy">
+  <div class="chips">
+    <div class="tarjeta chip"><b id="kPres">–</b><small>presentes</small></div>
+    <div class="tarjeta chip"><b id="kPun" style="color:var(--verde)">–</b><small>puntuales</small></div>
+    <div class="tarjeta chip"><b id="kAtr" style="color:var(--naranja)">–</b><small>atrasos</small></div>
+    <div class="tarjeta chip"><b id="kJus" style="color:var(--celeste)">–</b><small>justificados</small></div>
+    <div class="tarjeta chip"><b id="kFal" style="color:#8a8374">–</b><small>faltan</small></div>
+  </div>
+  <div class="tarjeta panel">
+    <div class="fila-ctl"><label>Materia:</label><select id="materia" onchange="seguir.checked = false; elegirMateria()" style="min-width:260px"></select>
+      <label style="display:flex;gap:6px;align-items:center;font-size:.9rem"><input type="checkbox" id="seguir" checked style="width:auto"> Seguir la clase en curso</label></div>
+    <div class="fila-ctl"><label>Fecha:</label><input type="date" id="fecha" onchange="actualizar(true)">
+      <input id="filtro" placeholder="Buscar estudiante…" oninput="pintarLista()" style="min-width:200px">
+      <small id="horario" style="color:var(--suave)"></small></div>
+    <div class="tabla"><table><thead><tr><th></th><th>Código</th><th>Estudiante</th><th>Estado</th><th>Entrada</th><th>Salida</th><th>Similitud</th><th>Origen</th><th>Corregir</th></tr></thead>
+      <tbody id="lista"></tbody></table></div>
+  </div>
+</section>
+
+<section class="vista" id="v-alertas">
+  <div class="tarjeta panel"><div class="fila-ctl"><h3 style="margin:0">Alertas y movimientos</h3>
+    <button class="sec" onclick="post('/api/admin/eventos/atender')">Marcar todas como vistas</button></div>
+    <div class="feed" id="feed"></div></div>
+</section>
+
+<section class="vista" id="v-estudiantes">
+  <div class="tarjeta panel">
+    <h3>Estudiantes</h3>
+    <p style="margin:0 0 10px;color:var(--suave)">El <b>rostro</b> se registra en la laptop (programa de escritorio → «Registrar rostro», con la cámara) <b>o aquí</b> con
+      el botón «📷 Fotos»: toma de 3 a 8 fotos de frente y girando un poco la cabeza, <b>una sola persona por foto</b>.</p>
+    <input type="file" id="fotosEst" accept="image/*" capture="user" multiple hidden>
+    <div class="tabla"><table><thead><tr><th></th><th>Código</th><th>Apellidos</th><th>Nombres</th><th>Semestre</th><th>Curso</th><th>Rostro</th><th>Activo</th><th>Acciones</th></tr></thead><tbody id="tEst"></tbody></table></div>
+    <div class="form"><input id="eCod" placeholder="Código / CI"><input id="eNom" placeholder="Nombres"><input id="eApe" placeholder="Apellidos">
+      <input id="eCur" placeholder="Carrera / curso"><select id="eSem"><option value="0">Semestre…</option><option value="1">1ro</option><option value="2">2do</option>
+      <option value="3">3ro</option><option value="4">4to</option><option value="5">5to</option><option value="6">6to</option></select>
+      <button class="verde" onclick="nuevoEst()">Agregar</button></div>
+  </div>
+</section>
+
+<section class="vista" id="v-reportes">
+  <div class="tarjeta panel">
+    <div class="fila-ctl"><label>Materia:</label><select id="rMateria" onchange="reporte()" style="min-width:260px"></select></div>
+    <div class="fila-ctl"><label>Desde</label><input type="date" id="rDesde"><label>hasta</label><input type="date" id="rHasta">
+      <button onclick="reporte()">Ver reporte</button>
+      <button class="sec" onclick="exportar('reporte')">reporte.csv</button><button class="sec" onclick="exportar('asistencias')">asistencias.csv</button>
+      <button class="sec" onclick="exportar('estudiantes')" id="expEst" hidden>estudiantes.csv</button><button class="sec" onclick="exportar('eventos')">eventos.csv</button></div>
+    <p id="rInfo" style="color:var(--suave);margin:0 0 8px"></p>
+    <div class="tabla"><table><thead><tr><th>Código</th><th>Estudiante</th><th>Puntual</th><th>Atraso</th><th>Justif.</th><th>Faltas</th><th>Sin salida</th><th>% asistencia</th></tr></thead><tbody id="tRep"></tbody></table></div>
+  </div>
+</section>
+
+<section class="vista" id="v-camara">
+  <div class="tarjeta panel camara"><h3>Cámara en vivo <small id="infoCam" style="font-weight:500;color:var(--suave)"></small></h3><img id="video" alt="Sin señal: inicia la cámara en el programa de escritorio"></div>
+</section>
+
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ESTADO = {puntual:'Puntual', atraso:'Atraso', justificado:'Justificado', falta:'Falta'};
+const hoyISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+const hora = t => new Date(t*1000).toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'});
+const ES_ADMIN = {{ES_ADMIN}};
+let ultimo = 0, primera = true, sonido = false, ctx = null, lista = [], materias = [];
+const seguir = document.getElementById('seguir');
+document.getElementById('tabEst').hidden = !ES_ADMIN; document.getElementById('expEst').hidden = !ES_ADMIN;
+document.getElementById('fecha').value = hoyISO();
+document.getElementById('rHasta').value = hoyISO();
+document.getElementById('rDesde').value = (() => { const d = new Date(); d.setDate(d.getDate()-30); return new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0,10); })();
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('activo', x === b));
+  document.querySelectorAll('.vista').forEach(v => v.classList.toggle('activa', v.id === 'v-' + b.dataset.v));
+  if (b.dataset.v === 'estudiantes') estudiantes();
+  if (b.dataset.v === 'reportes') reporte();
+  const v = document.getElementById('video');
+  if (b.dataset.v === 'camara') v.src = '/video?t=' + Date.now(); else v.removeAttribute('src');
+});
+
+async function post(url, cuerpo){
+  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cuerpo || {})});
+  if (r.status === 401) location.href = '/login?siguiente=/admin';
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) { alert(d.error || 'Error'); throw new Error(d.error); }
+  actualizar(true); return d;
+}
+function activarSonido(){
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); ctx.resume(); sonido = !sonido;
+  const b = document.getElementById('btnSonido'); b.textContent = sonido ? '🔊 Sonido activo' : '🔇 Activar sonido'; b.classList.toggle('on', sonido);
+  if (sonido) pitido(false);
+}
+function pitido(alerta){
+  if (!sonido || !ctx) return;
+  (alerta ? [440,330,440] : [660,990]).forEach((f,i) => { const o = ctx.createOscillator(), g = ctx.createGain(), t = ctx.currentTime + i*0.16;
+    o.frequency.value = f; o.type = 'triangle'; o.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.3,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.14); o.start(t); o.stop(t+0.15); });
+}
+function toast(ev){
+  pitido(ev.prioridad === 'alta');
+  const t = document.createElement('div'); t.className = 'toast ' + ev.prioridad; t.textContent = ev.mensaje; t.onclick = () => t.remove();
+  document.getElementById('toasts').prepend(t); setTimeout(() => t.remove(), 9000);
+}
+function marcar(id, estado){
+  let obs = '';
+  if (estado === 'justificado') { obs = prompt('Motivo de la justificación (opcional):', '') ; if (obs === null) return; }
+  if (estado === 'falta' && !confirm('¿Quitar la marca de asistencia de este día?')) return;
+  if (estado === 'sin_salida' && !confirm('¿Quitar la salida marcada?')) return;
+  post('/api/admin/marcar', {estudiante_id:id, materia_id: Number(materia.value), fecha: document.getElementById('fecha').value, estado, observacion: obs});
+}
+function pintarLista(){
+  const f = document.getElementById('filtro').value.toLowerCase();
+  document.getElementById('lista').innerHTML = lista.filter(x => !f || (x.nombre + x.codigo).toLowerCase().includes(f)).map(x => `<tr>
+    <td>${x.muestras ? `<img class="foto" src="/foto/${x.estudiante_id}" loading="lazy">` : '<span class="foto" title="Sin rostro registrado"></span>'}</td>
+    <td>${esc(x.codigo)}</td><td>${esc(x.nombre)}${x.observacion ? `<br><small style="color:var(--suave)">${esc(x.observacion)}</small>` : ''}</td>
+    <td><span class="st st-${x.estado}">${ESTADO[x.estado]}</span></td><td>${x.hora ? hora(x.hora) : '—'}</td><td>${x.hora_salida ? hora(x.hora_salida) : x.hora && x.estado !== 'justificado' ? '<span style="color:var(--naranja)">sin salida</span>' : ''}</td>
+    <td>${x.similitud ? x.similitud.toFixed(2) : ''}</td><td>${esc(x.fuente)}</td>
+    <td><div class="acc"><button class="verde" onclick="marcar(${x.estudiante_id},'puntual')">Puntual</button><button class="naranja" onclick="marcar(${x.estudiante_id},'atraso')">Atraso</button>
+      <button class="sec" onclick="marcar(${x.estudiante_id},'justificado')">Justificar</button>${x.hora ? `<button class="sec" onclick="marcar(${x.estudiante_id},'falta')">Quitar</button>` : ''}${x.hora && !x.hora_salida ? `<button onclick="marcar(${x.estudiante_id},'salida')">Salida</button>` : ''}${x.hora_salida ? `<button class="sec" onclick="marcar(${x.estudiante_id},'sin_salida')">Quitar salida</button>` : ''}</div></td></tr>`).join('');
+}
+async function actualizar(forzar){
+  try{
+    const r = await fetch(`/api/admin/estado?desde=${ultimo}&materia=${materia.value || 0}&fecha=${document.getElementById('fecha').value}`);
+    if (r.status === 401) return location.href = '/login?siguiente=/admin';
+    const d = await r.json();
+    const s = d.resumen;
+    document.getElementById('kPres').textContent = `${s.presentes}/${s.total}`;
+    ['kPun','kAtr','kJus','kFal'].forEach((k,i) => document.getElementById(k).textContent = [s.puntuales, s.atrasos, s.justificados, s.faltan][i]);
+    const m = materias.find(x => x.id == materia.value);
+    document.getElementById('horario').textContent = m ? `${m.docente || 'Sin docente'} · ${m.horario} · tolerancia ${m.tolerancia_min} min` : 'No hay materias a tu cargo en la gestión activa';
+    lista = d.lista; pintarLista();
+    const feed = document.getElementById('feed');
+    const html = e => `<div class="ev ${e.prioridad}"><time>${new Date(e.creado*1000).toLocaleString('es-BO')}</time>${esc(e.mensaje)}</div>`;
+    if (primera) feed.innerHTML = d.eventos.slice().reverse().map(html).join('');
+    else d.eventos.forEach(e => { feed.insertAdjacentHTML('afterbegin', html(e)); if (e.tipo.startsWith('marca') || e.prioridad === 'alta') toast(e); });
+    ultimo = d.ultimo_evento; primera = false;
+    const c = d.camara;
+    document.getElementById('ptCam').className = 'punto ' + (c.conectada ? 'on' : 'off');
+    document.getElementById('txtCam').textContent = c.conectada ? `Cámara activa · ${c.registrados} rostros` : 'Cámara apagada';
+    document.getElementById('infoCam').textContent = c.registrando ? '· registrando un rostro…' : '';
+  }catch(e){ document.getElementById('txtCam').textContent = 'Sin conexión'; }
+}
+async function estudiantes(){
+  const d = await (await fetch('/api/admin/estudiantes')).json();
+  document.getElementById('tEst').innerHTML = d.estudiantes.map(e => `<tr><td>${e.muestras ? `<img class="foto" src="/foto/${e.id}" loading="lazy">` : '<span class="foto"></span>'}</td>
+    <td>${esc(e.codigo)}</td><td>${esc(e.apellidos)}</td><td>${esc(e.nombres)}</td><td>${e.semestre ? SEM[e.semestre] : '<span style="color:var(--rojo)">sin inscribir</span>'}</td><td>${esc(e.curso)}</td>
+    <td>${e.muestras ? `✅ ${e.muestras} muestras` : '⚠️ sin registrar'}</td><td>${e.activo ? 'sí' : 'no'}</td>
+    <td><div class="acc"><button onclick="subirFotos(${e.id})">📷 Fotos</button>${e.muestras ? `<button class="sec" onclick="borrarRostro(${e.id})">Borrar rostro</button>` : ''}
+      <button class="sec" onclick="eliminarEst(${e.id}, '${esc(e.codigo)}')">Eliminar</button></div></td></tr>`).join('');
+}
+let estFotos = 0;
+function subirFotos(id){ estFotos = id; document.getElementById('fotosEst').click(); }
+function achicar(archivo){
+  return new Promise((ok, mal) => { const img = new Image();
+    img.onload = () => { const k = Math.min(1, 960 / Math.max(img.width, img.height)); const c = document.createElement('canvas');
+      c.width = Math.round(img.width*k); c.height = Math.round(img.height*k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => b ? ok(b) : mal(new Error('foto')), 'image/jpeg', 0.9); URL.revokeObjectURL(img.src); };
+    img.onerror = () => mal(new Error('No se pudo leer ' + archivo.name)); img.src = URL.createObjectURL(archivo); });
+}
+document.getElementById('fotosEst').onchange = async e => {
+  const archivos = [...e.target.files].slice(0, 10); e.target.value = '';
+  if (!archivos.length) return;
+  const reemplazar = confirm('¿REEMPLAZAR las muestras anteriores de este estudiante?\nAceptar = reemplazar · Cancelar = agregar a las que ya tiene');
+  const datos = new FormData(); datos.append('reemplazar', reemplazar ? '1' : '0');
+  for (const [i, a] of archivos.entries()) datos.append('fotos', await achicar(a), `foto${i + 1}.jpg`);
+  const r = await fetch(`/api/admin/estudiante/${estFotos}/fotos`, {method: 'POST', body: datos});
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) return alert(d.error || 'Error');
+  alert(`Se guardaron ${d.guardadas} muestra(s). Ahora tiene ${d.total}.` + (d.errores.length ? '\n\nNo sirvieron:\n' + d.errores.join('\n') : '') + (d.aviso ? '\n\n⚠️ ' + d.aviso : ''));
+  estudiantes();
+};
+async function borrarRostro(id){ if (confirm('¿Borrar las muestras del rostro? Tendrá que registrarse de nuevo.')) { await post(`/api/admin/estudiante/${id}/borrar-rostro`); estudiantes(); } }
+async function eliminarEst(id, cod){ if (confirm(`¿ELIMINAR al estudiante ${cod} con su rostro y TODAS sus asistencias? No se puede deshacer.`)) { await post(`/api/admin/estudiante/${id}/eliminar`); estudiantes(); } }
+async function nuevoEst(){
+  await post('/api/admin/estudiante', {codigo: eCod.value, nombres: eNom.value, apellidos: eApe.value, curso: eCur.value, semestre: Number(eSem.value)});
+  ['eCod','eNom','eApe','eCur'].forEach(i => document.getElementById(i).value = ''); estudiantes();
+}
+async function reporte(){
+  if (!rMateria.value) { document.getElementById('rInfo').textContent = 'No hay materias.'; document.getElementById('tRep').innerHTML = ''; return; }
+  const r = await fetch(`/api/admin/reporte?materia=${rMateria.value}&desde=${rDesde.value}&hasta=${rHasta.value}`); const d = await r.json();
+  if (!r.ok) return alert(d.error || 'Error');
+  document.getElementById('rInfo').textContent = `${d.materia.titulo} · ${d.materia.semestre_texto} semestre · ${d.materia.docente || 'sin docente'}: ${d.dias.length} día(s) de clase entre ${d.desde} y ${d.hasta}.`;
+  document.getElementById('tRep').innerHTML = d.filas.map(f => `<tr><td>${esc(f.codigo)}</td><td>${esc(f.nombre)}</td><td>${f.puntuales}</td><td>${f.atrasos}</td>
+    <td>${f.justificados}</td><td>${f.faltas}</td><td>${f.sin_salida}</td><td><b style="color:${f.porcentaje >= 80 ? 'var(--verde)' : f.porcentaje >= 60 ? 'var(--naranja)' : 'var(--rojo)'}">${f.porcentaje}%</b></td></tr>`).join('');
+}
+function exportar(tipo){ location.href = `/admin/exportar/${tipo}.csv?materia=${rMateria.value || 0}&desde=${rDesde.value}&hasta=${rHasta.value}`; }
+const SEM = ['', '1ro', '2do', '3ro', '4to', '5to', '6to'];
+const materia = document.getElementById('materia'), rMateria = document.getElementById('rMateria');
+function elegirMateria(){ lista = []; actualizar(true); }
+// Materias visibles (admin: todas; docente: las suyas). Si se sigue la clase en curso, elige la que corre ahora.
+async function cargarMaterias(){
+  try{
+    const d = await (await fetch('/api/admin/materias')).json();
+    const antes = materia.value;
+    if (JSON.stringify(d.materias) !== JSON.stringify(materias)) {
+      materias = d.materias;
+      const opciones = materias.map(m => `<option value="${m.id}">${esc(m.semestre_texto)} · ${esc(m.titulo)}${ES_ADMIN && m.docente ? ' — ' + esc(m.docente) : ''}</option>`).join('');
+      const rAntes = rMateria.value;
+      materia.innerHTML = rMateria.innerHTML = opciones;
+      if (antes) materia.value = antes;
+      if (rAntes) rMateria.value = rAntes;
+    }
+    if (seguir.checked && d.en_curso.length && !d.en_curso.includes(Number(materia.value))) { materia.value = d.en_curso[0]; rMateria.value = materia.value; }
+    if (materia.value !== antes) elegirMateria();
+  }catch(e){}
+}
+seguir.onchange = () => { if (seguir.checked) cargarMaterias(); };
+cargarMaterias().then(() => actualizar()); setInterval(actualizar, 2000); setInterval(cargarMaterias, 20000);
+</script>
+</body></html>

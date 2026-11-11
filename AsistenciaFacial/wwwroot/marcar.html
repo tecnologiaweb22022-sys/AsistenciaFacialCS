@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Marcar asistencia · {{INSTITUCION}}</title>
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+  main{max-width:520px;margin:0 auto;padding:18px 16px 40px}
+  h1{font-size:1.5rem;margin:6px 0 2px} .sub{color:var(--suave);margin:0 0 16px}
+  .caja{padding:18px} label{font-weight:700;display:block;margin:0 0 6px}
+  #codigo{font-size:1.4rem;text-align:center;letter-spacing:.08em;margin-bottom:14px}
+  .boton{width:100%;padding:1em;font-size:1.15rem;border-radius:14px}
+  .vista{display:none;margin:14px auto 0;width:180px;height:180px;border-radius:50%;object-fit:cover;border:5px solid var(--linea)}
+  .estado{display:none;margin-top:14px;padding:16px;border-radius:14px;text-align:center;font-weight:600}
+  .estado.ok{background:#e3f4ea;color:#1c6b40} .estado.atraso{background:#fdebd5;color:#8a4b08}
+  .estado.error{background:#fbe3e6;color:#8f2433} .estado.espera{background:#e6eef8;color:var(--azul)}
+  .estado b{display:block;font-size:1.35rem;margin-bottom:4px}
+  .consejos{margin-top:16px;padding:14px;font-size:.9rem;color:var(--suave)} .consejos li{margin:3px 0}
+  .reloj{font-size:2.2rem;font-weight:800;color:var(--azul);text-align:center;font-variant-numeric:tabular-nums}
+</style></head>
+<body>
+<div class="barra"><div class="marca">{{INSTITUCION}}<small>Marcar asistencia con una selfie</small></div></div>
+<main>
+  <h1>Marcar asistencia</h1>
+  <p class="sub">Gestión {{GESTION}} · se marca en la materia que tiene clase ahora</p>
+  <div class="reloj" id="reloj">--:--</div>
+  <div class="tarjeta caja" id="formulario">
+    <div id="bloqueCodigo">
+      <label for="codigo">Tu código o CI</label>
+      <input id="codigo" inputmode="text" autocomplete="off" placeholder="Ej. 1234567" maxlength="30">
+    </div>
+    <!-- capture="user" abre la cámara frontal: funciona en red local SIN https -->
+    <input type="file" id="foto" accept="image/*" capture="user" hidden>
+    <button class="boton naranja" id="btnFoto">📷 Tomar selfie y marcar</button>
+    <img class="vista" id="vista" alt="">
+    <div class="estado" id="estado"></div>
+  </div>
+  <div class="tarjeta consejos">
+    <b>Para que te reconozca:</b>
+    <ul><li>Mira de frente, con la cara completa y buena luz.</li><li>Sin gorra, lentes oscuros ni barbijo.</li>
+      <li>Solo tú en la foto, con el celular a la altura de los ojos.</li></ul>
+    <a href="/mi-asistencia">Consultar mi asistencia →</a>
+  </div>
+</main>
+<div class="pie">IAR-600 · Inteligencia Artificial y Robótica · funciona sin internet</div>
+<script>
+const HABILITADO = {{HABILITADO}}, PIDE_CODIGO = {{PIDE_CODIGO}};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const tic = () => $('reloj').textContent = new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+tic(); setInterval(tic, 1000);
+if (!PIDE_CODIGO) $('bloqueCodigo').style.display = 'none';
+try { $('codigo').value = localStorage.getItem('codigo') || ''; } catch(e) {}
+
+function estado(clase, html){ const e = $('estado'); e.className = 'estado ' + clase; e.innerHTML = html; e.style.display = 'block'; }
+
+if (!HABILITADO) {
+  $('btnFoto').disabled = true;
+  estado('error', '<b>Marcación desde el celular desactivada</b>Mira a la cámara del aula para marcar.');
+}
+
+$('btnFoto').onclick = () => {
+  if (PIDE_CODIGO && !$('codigo').value.trim()) { estado('error', '<b>Escribe tu código</b>Es el mismo que te dio el docente.'); $('codigo').focus(); return; }
+  $('foto').click();
+};
+
+// Achica la foto en el celular (≈ 960 px) para enviarla rápido por el WiFi.
+function achicar(archivo){
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 960 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      c.toBlob(b => b ? ok(b) : mal(new Error('No se pudo procesar la foto')), 'image/jpeg', 0.88);
+      URL.revokeObjectURL(img.src);
+    };
+    img.onerror = () => mal(new Error('No se pudo leer la foto'));
+    img.src = URL.createObjectURL(archivo);
+  });
+}
+
+$('foto').onchange = async () => {
+  const archivo = $('foto').files[0];
+  if (!archivo) return;
+  $('vista').src = URL.createObjectURL(archivo); $('vista').style.display = 'block';
+  $('btnFoto').disabled = true;
+  estado('espera', '<b>Reconociendo tu rostro…</b>La red neuronal está comparando tu selfie.');
+  try {
+    const datos = new FormData();
+    datos.append('codigo', $('codigo').value.trim());
+    datos.append('foto', await achicar(archivo), 'selfie.jpg');
+    const r = await fetch('/api/marcar', {method: 'POST', body: datos});
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      estado('error', `<b>No se marcó</b>${esc(d.error || 'Error')}${d.similitud !== undefined ? `<br><small>similitud ${d.similitud}</small>` : ''}`);
+    } else {
+      try { localStorage.setItem('codigo', $('codigo').value.trim()); } catch(e) {}
+      const titulo = d.motivo ? 'No se marcó' : d.nueva && d.tipo === 'salida' ? '¡Salida registrada! Hasta luego' : d.nueva ? (d.estado === 'atraso' ? 'Entrada con ATRASO' : '¡Entrada registrada!') : 'Ya estabas marcado';
+      estado(d.motivo ? 'error' : d.estado === 'atraso' ? 'atraso' : 'ok',
+        `<b>${titulo}</b>${esc(d.nombre)}${d.materia && !d.motivo ? '<br>' + esc(d.materia) : ''}${d.hora ? ' · entrada ' + d.hora : ''}${d.salida ? ' · salida ' + d.salida : ''}${d.motivo ? '<br>' + esc(d.motivo) : ''}<br><small>similitud ${d.similitud}</small>`);
+      if (navigator.vibrate) navigator.vibrate(d.nueva ? [80, 60, 80] : 60);
+    }
+  } catch (e) {
+    estado('error', '<b>Sin conexión</b>¿Estás conectado al WiFi del aula?');
+  }
+  $('btnFoto').disabled = !HABILITADO;
+  $('foto').value = '';
+};
+</script>
+</body></html>

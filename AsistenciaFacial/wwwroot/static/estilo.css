@@ -1,0 +1,39 @@
+/* Estilo común — sin internet: solo fuentes del sistema */
+:root{
+  --fondo:#f6f1e7; --papel:#fffdf8; --tinta:#14213d; --suave:#5b6478; --linea:#e3dccd;
+  --azul:#1d4e89; --celeste:#3a9bd5; --naranja:#f08a24; --verde:#2a9d5c; --amarillo:#f2b705;
+  --rojo:#d1495b; --sombra:0 1px 2px rgba(20,33,61,.08),0 4px 14px rgba(20,33,61,.06);
+  --radio:14px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Ubuntu,sans-serif;color:var(--tinta);
+  background:var(--fondo);
+  background-image:linear-gradient(rgba(58,155,213,.07) 1px,transparent 1px),
+                   linear-gradient(90deg,rgba(58,155,213,.07) 1px,transparent 1px);
+  background-size:24px 24px; line-height:1.4}
+a{color:var(--azul)}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:.55em .9em;background:var(--azul);color:#fff;font-weight:600}
+button:hover{filter:brightness(1.08)} button:disabled{opacity:.45;cursor:default}
+button.sec{background:#fff;color:var(--tinta);border:1px solid var(--linea)}
+button.verde{background:var(--verde)} button.naranja{background:var(--naranja)} button.rojo{background:var(--rojo)}
+button.amarillo{background:var(--amarillo);color:var(--tinta)}
+input,select,textarea{font:inherit;padding:.5em .65em;border:1px solid var(--linea);border-radius:10px;background:#fff;color:var(--tinta);width:100%}
+.tarjeta{background:var(--papel);border:1px solid var(--linea);border-radius:var(--radio);box-shadow:var(--sombra)}
+.barra{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--tinta);color:#fff}
+.barra .marca{font-weight:800;letter-spacing:.3px}
+.barra .marca small{display:block;font-weight:500;opacity:.7;font-size:.75rem}
+.pildora{display:inline-flex;align-items:center;gap:6px;padding:.25em .7em;border-radius:99px;font-size:.82rem;font-weight:600;background:rgba(255,255,255,.12)}
+.punto{width:9px;height:9px;border-radius:50%;background:#999;display:inline-block}
+.punto.on{background:#4ade80;box-shadow:0 0 0 3px rgba(74,222,128,.25)} .punto.off{background:var(--rojo)}
+.pie{text-align:center;color:var(--suave);font-size:.8rem;padding:18px}
+
+/* colores por estado de mesa */
+.e-libre{--c:var(--verde)} .e-ocupada{--c:var(--azul)} .e-con_pedido{--c:var(--naranja)}
+.e-servida{--c:var(--celeste)} .e-llamando{--c:var(--amarillo)} .e-cuenta{--c:var(--amarillo)}
+@keyframes latido{0%,100%{box-shadow:0 0 0 0 rgba(242,183,5,.55)}50%{box-shadow:0 0 0 10px rgba(242,183,5,0)}}
+.e-llamando,.e-cuenta{animation:latido 1.4s infinite}
+
+/* estados de asistencia */
+.st{display:inline-block;padding:.15em .6em;border-radius:99px;font-size:.8rem;font-weight:700;color:#fff;background:#8a8374}
+.st-puntual{background:var(--verde)} .st-atraso{background:var(--naranja)} .st-justificado{background:var(--celeste)} .st-falta{background:#b8b0a0}

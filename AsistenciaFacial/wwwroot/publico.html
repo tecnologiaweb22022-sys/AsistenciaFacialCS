@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asistencia de hoy · {{INSTITUCION}}</title>
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+  main{max-width:1100px;margin:0 auto;padding:18px 16px}
+  .cab{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  h1{font-size:1.6rem;margin:6px 0 2px} .sub{color:var(--suave);margin:0}
+  .reloj{font-size:2.6rem;font-weight:800;color:var(--azul);font-variant-numeric:tabular-nums}
+  .clases{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;margin-top:16px}
+  .clase{padding:14px 16px}
+  .clase h2{font-size:1.15rem;margin:0} .clase .meta{color:var(--suave);font-size:.88rem;margin:2px 0 10px}
+  .sem{display:inline-block;background:var(--azul);color:#fff;border-radius:8px;padding:.05em .5em;font-size:.8rem;font-weight:700;margin-right:6px}
+  .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+  .chip{padding:8px;text-align:center;border:1px solid var(--linea);border-radius:10px;background:#fff} .chip b{display:block;font-size:1.5rem} .chip small{color:var(--suave);font-size:.75rem}
+  .chip.v b{color:var(--verde)} .chip.n b{color:var(--naranja)} .chip.g b{color:#8a8374}
+  .fila{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--linea)}
+  .fila:last-child{border-bottom:0} .fila .n{font-weight:600} .fila time{color:var(--suave);margin-right:10px;font-variant-numeric:tabular-nums}
+  .lista{max-height:46vh;overflow:auto}
+  .nuevo{animation:aparece 1.2s ease} @keyframes aparece{from{background:#fff3c4}to{background:transparent}}
+  .vacio{color:var(--suave);padding:20px 0;text-align:center}
+  .pie2{margin-top:16px;padding:14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  @media(max-width:560px){.reloj{font-size:2rem}}
+</style></head>
+<body>
+<div class="barra"><div class="marca">{{INSTITUCION}}<small>Control de asistencia con reconocimiento facial</small></div>
+  <div style="margin-left:auto"><span class="pildora"><span class="punto" id="pt"></span><span id="cam">Cámara…</span></span></div></div>
+<main>
+  <div class="cab">
+    <div><h1>Clases en curso</h1><p class="sub">Gestión <span id="gestion">{{GESTION}}</span> · <span id="fecha"></span></p></div>
+    <div class="reloj" id="reloj">--:--</div>
+  </div>
+  <div class="clases" id="clases"><div class="tarjeta clase vacio">Cargando…</div></div>
+  <div class="tarjeta pie2"><span>📷 Para marcar: <b>mira a la cámara</b> al llegar. Se registra en la materia de tu semestre que tiene clase ahora.</span>
+    <span style="display:flex;gap:8px;flex-wrap:wrap"><a href="/marcar" id="lnkMarcar" hidden><button class="naranja">📷 Marcar con selfie</button></a><a href="/mi-asistencia"><button>Consultar mi asistencia</button></a></span></div>
+</main>
+<div class="pie">Control de asistencia · funciona sin internet</div>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ESTADO = {puntual:'Puntual', atraso:'Atraso', justificado:'Justificado'};
+let vistos = new Set(), primera = true;
+function reloj(){ document.getElementById('reloj').textContent = new Date().toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit'}); }
+function tarjeta(c){
+  const m = c.clase.materia, r = c.resumen;
+  let lista;
+  if (c.llegaron === null) lista = '<div class="vacio">La lista de nombres no es pública.</div>';
+  else if (!c.llegaron.length) lista = '<div class="vacio">Todavía nadie marcó en esta clase.</div>';
+  else lista = c.llegaron.map(x => {
+    const k = m.id + x.nombre + x.hora, nuevo = !primera && !vistos.has(k); vistos.add(k);
+    return `<div class="fila ${nuevo ? 'nuevo' : ''}"><span class="n">${esc(x.nombre)}</span><span><time>${x.hora}${x.salida ? ' → ' + x.salida : ''}</time><span class="st st-${x.estado}">${ESTADO[x.estado] || x.estado}</span></span></div>`;
+  }).join('');
+  return `<div class="tarjeta clase">
+    <h2><span class="sem">${esc(m.semestre_texto)}</span>${esc(m.titulo)}</h2>
+    <div class="meta">${esc(m.docente || 'Sin docente')} · ${c.clase.inicio}–${c.clase.fin} · puntual hasta <b>${c.clase.limite}</b></div>
+    <div class="chips"><div class="chip"><b>${r.presentes}/${r.total}</b><small>presentes</small></div>
+      <div class="chip v"><b>${r.puntuales}</b><small>puntuales</small></div><div class="chip n"><b>${r.atrasos}</b><small>atrasos</small></div>
+      <div class="chip g"><b>${r.faltan}</b><small>aún no llegan</small></div></div>
+    <div class="lista">${lista}</div></div>`;
+}
+async function cargar(){
+  try{
+    const d = await (await fetch('/api/publico')).json();
+    document.getElementById('fecha').textContent = new Date(d.fecha + 'T12:00').toLocaleDateString('es-BO',{weekday:'long', day:'numeric', month:'long'});
+    document.getElementById('gestion').textContent = d.gestion;
+    document.getElementById('lnkMarcar').hidden = !d.marcar_celular;
+    document.getElementById('pt').className = 'punto ' + (d.camara.conectada ? 'on' : 'off');
+    document.getElementById('cam').textContent = d.camara.conectada ? 'Cámara activa' : 'Cámara apagada';
+    document.getElementById('clases').innerHTML = d.clases.length ? d.clases.map(tarjeta).join('')
+      : '<div class="tarjeta clase vacio">No hay clases en este momento.</div>';
+    primera = false;
+  }catch(e){ document.getElementById('cam').textContent = 'Sin conexión'; document.getElementById('pt').className = 'punto off'; }
+}
+reloj(); setInterval(reloj, 1000); cargar(); setInterval(cargar, 3000);
+</script>
+</body></html>

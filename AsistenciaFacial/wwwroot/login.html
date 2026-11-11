@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ingreso · Control de asistencia</title>
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+  .caja{max-width:380px;margin:12vh auto;padding:28px}
+  h1{font-size:1.3rem;margin:0 0 4px} p{color:var(--suave);margin:0 0 18px}
+  label{display:block;font-weight:600;font-size:.9rem;margin:0 0 6px}
+  select{margin-bottom:14px}
+  input{font-size:1.6rem;text-align:center;letter-spacing:.4em;margin-bottom:12px}
+  button{width:100%;padding:.8em}
+  .error{color:var(--rojo);font-weight:600;margin-bottom:10px}
+</style></head>
+<body>
+<form class="caja tarjeta" method="post" id="f">
+  <h1>Panel de asistencia</h1>
+  <p>{{INSTITUCION}} · Gestión {{GESTION}}</p>
+  {{ERROR}}
+  <label for="usuario">¿Quién eres?</label>
+  <select name="usuario" id="usuario">{{USUARIOS}}</select>
+  <label for="pin">PIN</label>
+  <input name="pin" id="pin" type="password" inputmode="numeric" autocomplete="current-password" autofocus required>
+  <button>Entrar</button>
+  <p style="margin-top:16px;font-size:.85rem"><a href="/">← Volver a la vista pública</a></p>
+</form>
+<script>
+// recuerda quién entró la última vez en este celular
+const sel = document.getElementById('usuario');
+try { const u = localStorage.getItem('usuario'); if (u && [...sel.options].some(o => o.value === u)) sel.value = u; } catch(e) {}
+document.getElementById('f').addEventListener('submit', () => { try { localStorage.setItem('usuario', sel.value); } catch(e) {} });
+</script>
+</body></html>

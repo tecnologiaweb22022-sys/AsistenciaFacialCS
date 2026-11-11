@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mi asistencia · {{INSTITUCION}}</title>
+<link rel="stylesheet" href="/static/estilo.css">
+<style>
+  main{max-width:640px;margin:0 auto;padding:16px 14px 40px}
+  .buscar{padding:16px;display:flex;gap:8px} .buscar input{font-size:1.1rem}
+  h1{font-size:1.3rem;margin:12px 0 4px} .sub{color:var(--suave);margin:0 0 12px}
+  h2{font-size:1rem;margin:18px 0 8px}
+  .mat{padding:12px 14px;margin-bottom:10px}
+  .mat .tit{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .mat .tit b{font-size:1rem} .mat .tit span{font-size:1.5rem;font-weight:800}
+  .mat small{color:var(--suave)}
+  .barra2{height:10px;border-radius:99px;background:var(--linea);overflow:hidden;margin:8px 0 6px} .barra2 i{display:block;height:100%}
+  .nums{display:flex;gap:12px;flex-wrap:wrap;font-size:.85rem;color:var(--suave)} .nums b{color:var(--tinta)}
+  .dias{padding:4px 14px} .dia{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--linea)}
+  .dia:last-child{border:0} .dia small{color:var(--suave)}
+  .error{color:var(--rojo);font-weight:600;padding:10px 0}
+  .aviso{padding:12px;background:#fff7df;border-left:5px solid var(--amarillo);margin-bottom:12px;border-radius:10px}
+</style></head>
+<body>
+<div class="barra"><div class="marca">Mi asistencia<small>{{INSTITUCION}} · Gestión {{GESTION}}</small></div>
+  <div style="margin-left:auto"><a href="/" style="color:#fff;opacity:.7;font-size:.85rem">Clases en curso</a></div></div>
+<main>
+  <form class="tarjeta buscar" onsubmit="buscar(event)">
+    <input id="codigo" placeholder="Tu código o CI" autocomplete="off" inputmode="numeric" required>
+    <button>Ver</button>
+  </form>
+  <div id="res"></div>
+</main>
+<div class="pie">Control de asistencia · funciona sin internet</div>
+<script>
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ESTADO = {puntual:'Puntual', atraso:'Atraso', justificado:'Justificado', falta:'Falta'};
+const color = p => p >= 80 ? 'var(--verde)' : p >= 60 ? 'var(--naranja)' : 'var(--rojo)';
+async function buscar(ev){
+  if (ev) ev.preventDefault();
+  const cod = document.getElementById('codigo').value.trim(); if (!cod) return;
+  try { localStorage.setItem('codigo', cod); } catch(e) {}
+  const R = document.getElementById('res');
+  const r = await fetch('/api/estudiante/' + encodeURIComponent(cod)); const d = await r.json();
+  if (!r.ok) { R.innerHTML = `<div class="error">${esc(d.error)}</div>`; return; }
+  const e = d.estudiante;
+  let html = `<h1>${esc(e.nombre)}</h1><p class="sub">Código ${esc(e.codigo)}${e.curso ? ' · ' + esc(e.curso) : ''}` +
+    (e.semestre ? ` · <b>${esc(e.semestre_texto)} semestre</b> (gestión ${esc(d.gestion)})` : '') + '</p>';
+  if (!e.rostro_registrado) html += '<div class="aviso">⚠️ Tu rostro todavía no está registrado: pide que lo registren.</div>';
+  if (!e.semestre) html += `<div class="aviso">No estás inscrito en ningún semestre de la gestión ${esc(d.gestion)}. Avisa en dirección.</div>`;
+  if (d.materias.length) html += '<h2>Mis materias</h2>' + d.materias.map(m => `<div class="tarjeta mat">
+      <div class="tit"><b>${esc(m.materia)}</b><span style="color:${color(m.porcentaje)}">${m.porcentaje}%</span></div>
+      <small>${esc(m.docente || 'Sin docente')} · ${m.dias} clase(s)</small>
+      <div class="barra2"><i style="width:${m.porcentaje}%;background:${color(m.porcentaje)}"></i></div>
+      <div class="nums"><span><b>${m.puntuales}</b> puntual</span><span><b>${m.atrasos}</b> atraso</span><span><b>${m.justificados}</b> justificado</span><span><b>${m.faltas}</b> falta</span>${m.sin_salida ? `<span><b>${m.sin_salida}</b> sin salida</span>` : ''}</div>
+    </div>`).join('');
+  html += '<h2>Últimas clases</h2><div class="tarjeta dias">' + (d.dias.length ? d.dias.map(x => `<div class="dia"><span>
+      ${new Date(x.fecha+'T12:00').toLocaleDateString('es-BO',{weekday:'short', day:'numeric', month:'short'})} · ${esc(x.materia)}
+      ${x.hora ? `<small>· ${x.hora}${x.salida ? ' – ' + x.salida : ' (sin salida)'}</small>` : ''}${x.observacion ? `<br><small>${esc(x.observacion)}</small>` : ''}</span>
+      <span class="st st-${x.estado}">${ESTADO[x.estado]}</span></div>`).join('') : '<p class="sub" style="padding:12px 0">Aún no hay clases registradas.</p>') + '</div>';
+  R.innerHTML = html;
+}
+try { const c = localStorage.getItem('codigo'); if (c) { document.getElementById('codigo').value = c; buscar(); } } catch(e) {}
+</script>
+</body></html>
