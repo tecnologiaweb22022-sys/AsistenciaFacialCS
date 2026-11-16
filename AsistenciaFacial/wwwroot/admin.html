@@ -41,7 +41,7 @@
   .toast::before{content:"✓";width:30px;height:30px;border-radius:50%;background:var(--verde);color:#fff;display:grid;place-items:center;flex:none}
   .toast.alta::before{content:"!";background:var(--rojo)}
   @keyframes desliza{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
-  .form{display:grid;grid-template-columns:1fr 1.4fr 1.4fr 1fr 1fr auto;gap:10px;padding:16px 22px 22px}
+  .form{display:grid;grid-template-columns:1fr 1.3fr 1.3fr 1fr 1.3fr 1fr auto;gap:10px;padding:16px 22px 22px}
   .nota{margin:0 22px 12px;padding:12px 16px;color:#7a3d06;font-size:.88rem;background:var(--naranja-50);border-radius:14px}
   .exportar{display:flex;gap:6px;flex-wrap:wrap} .exportar button{font-size:.8rem;padding:.5em .9em}
   #rInfo{margin:0 22px 8px;color:var(--suave);font-size:.88rem} #rInfo:empty{display:none}
@@ -91,6 +91,8 @@
   <div class="tarjeta panel">
     <div class="panel-cab"><div><h3>Lista de la clase</h3><p>Corrige el estado de cada estudiante con los botones de la derecha.</p></div><span class="horario" id="horario"></span></div>
     <div class="filtros">
+      <div class="campo"><label for="fCarrera">Carrera</label><select id="fCarrera" onchange="filtrar('f')"></select></div>
+      <div class="campo"><label for="fNivel">Semestre / año</label><select id="fNivel" onchange="filtrar('f', true)"></select></div>
       <div class="campo"><label for="materia">Materia</label><select id="materia" onchange="seguir.checked = false; elegirMateria()" style="min-width:300px"></select></div>
       <label class="chk"><input type="checkbox" id="seguir" checked> Seguir la clase en curso</label>
       <div class="campo"><label for="fecha">Fecha</label><input type="date" id="fecha" onchange="actualizar(true)"></div>
@@ -116,10 +118,9 @@
     <p class="nota">📷 El <b>rostro</b> se registra en la laptop (programa de escritorio → «Registrar rostro») <b>o aquí</b> con el botón «Fotos»:
       toma de 3 a 8 fotos de frente y girando un poco la cabeza, <b>una sola persona por foto</b>.</p>
     <input type="file" id="fotosEst" accept="image/*" capture="user" multiple hidden>
-    <div class="tabla"><table><thead><tr><th></th><th>Código</th><th>Apellidos</th><th>Nombres</th><th>Semestre</th><th>Curso</th><th>Rostro</th><th>Activo</th><th>Acciones</th></tr></thead><tbody id="tEst"></tbody></table></div>
+    <div class="tabla"><table><thead><tr><th></th><th>Código</th><th>Apellidos</th><th>Nombres</th><th>Inscripción</th><th>Curso</th><th>Rostro</th><th>Activo</th><th>Acciones</th></tr></thead><tbody id="tEst"></tbody></table></div>
     <div class="form"><input id="eCod" placeholder="Código / CI"><input id="eNom" placeholder="Nombres"><input id="eApe" placeholder="Apellidos">
-      <input id="eCur" placeholder="Carrera / curso"><select id="eSem"><option value="0">Semestre…</option><option value="1">1ro</option><option value="2">2do</option>
-      <option value="3">3ro</option><option value="4">4to</option><option value="5">5to</option><option value="6">6to</option></select>
+      <input id="eCur" placeholder="Curso / paralelo"><select id="eCar" onchange="nivelesAlta()"></select><select id="eSem"></select>
       <button class="naranja" onclick="nuevoEst()">+ Agregar</button></div>
   </div>
 </section>
@@ -131,6 +132,8 @@
         <button class="sec" onclick="exportar('reporte')">⬇ reporte.csv</button><button class="sec" onclick="exportar('asistencias')">⬇ asistencias.csv</button>
         <button class="sec" onclick="exportar('estudiantes')" id="expEst" hidden>⬇ estudiantes.csv</button><button class="sec" onclick="exportar('eventos')">⬇ eventos.csv</button></div></div>
     <div class="filtros">
+      <div class="campo"><label for="rCarrera">Carrera</label><select id="rCarrera" onchange="filtrar('r')"></select></div>
+      <div class="campo"><label for="rNivel">Semestre / año</label><select id="rNivel" onchange="filtrar('r', true)"></select></div>
       <div class="campo"><label for="rMateria">Materia</label><select id="rMateria" onchange="reporte()" style="min-width:300px"></select></div>
       <div class="campo"><label for="rDesde">Desde</label><input type="date" id="rDesde"></div>
       <div class="campo"><label for="rHasta">Hasta</label><input type="date" id="rHasta"></div>
@@ -240,7 +243,7 @@ async function actualizar(forzar){
 async function estudiantes(){
   const d = await (await fetch('/api/admin/estudiantes')).json();
   document.getElementById('tEst').innerHTML = d.estudiantes.map(e => `<tr><td>${e.muestras ? `<img class="foto" src="/foto/${e.id}" loading="lazy">` : '<span class="foto"></span>'}</td>
-    <td>${esc(e.codigo)}</td><td>${esc(e.apellidos)}</td><td>${esc(e.nombres)}</td><td>${e.semestre ? SEM[e.semestre] : '<span style="color:var(--rojo)">sin inscribir</span>'}</td><td>${esc(e.curso)}</td>
+    <td>${esc(e.codigo)}</td><td>${esc(e.apellidos)}</td><td>${esc(e.nombres)}</td><td>${e.semestre ? `<span class="st" style="background:var(--marino-100);color:var(--marino-700)">${esc(e.inscripcion)}</span>` : '<span class="st st-atraso">sin inscribir</span>'}</td><td>${esc(e.curso)}</td>
     <td>${e.muestras ? `<span class="st st-puntual">${e.muestras} muestras</span>` : '<span class="st st-atraso">sin registrar</span>'}</td><td>${e.activo ? 'sí' : '<span style="color:var(--tenue)">no</span>'}</td>
     <td><div class="acc"><button class="naranja" onclick="subirFotos(${e.id})">📷 Fotos</button>${e.muestras ? `<button class="sec" onclick="borrarRostro(${e.id})">Borrar rostro</button>` : ''}
       <button class="sec" onclick="eliminarEst(${e.id}, '${esc(e.codigo)}')">Eliminar</button></div></td></tr>`).join('');
@@ -269,21 +272,63 @@ document.getElementById('fotosEst').onchange = async e => {
 async function borrarRostro(id){ if (confirm('¿Borrar las muestras del rostro? Tendrá que registrarse de nuevo.')) { await post(`/api/admin/estudiante/${id}/borrar-rostro`); estudiantes(); } }
 async function eliminarEst(id, cod){ if (confirm(`¿ELIMINAR al estudiante ${cod} con su rostro y TODAS sus asistencias? No se puede deshacer.`)) { await post(`/api/admin/estudiante/${id}/eliminar`); estudiantes(); } }
 async function nuevoEst(){
-  await post('/api/admin/estudiante', {codigo: eCod.value, nombres: eNom.value, apellidos: eApe.value, curso: eCur.value, semestre: Number(eSem.value)});
+  await post('/api/admin/estudiante', {codigo: eCod.value, nombres: eNom.value, apellidos: eApe.value, curso: eCur.value,
+    carrera_id: Number(eCar.value), semestre: Number(eCar.value) ? Number(eSem.value) : 0});
   ['eCod','eNom','eApe','eCur'].forEach(i => document.getElementById(i).value = ''); estudiantes();
 }
 async function reporte(){
   if (!rMateria.value) { document.getElementById('rInfo').textContent = 'No hay materias.'; document.getElementById('tRep').innerHTML = ''; return; }
   const r = await fetch(`/api/admin/reporte?materia=${rMateria.value}&desde=${rDesde.value}&hasta=${rHasta.value}`); const d = await r.json();
   if (!r.ok) return alert(d.error || 'Error');
-  document.getElementById('rInfo').textContent = `${d.materia.titulo} · ${d.materia.semestre_texto} semestre · ${d.materia.docente || 'sin docente'}: ${d.dias.length} día(s) de clase entre ${d.desde} y ${d.hasta}.`;
+  document.getElementById('rInfo').textContent = `${d.materia.titulo} · ${d.materia.curso} · ${d.materia.docente || 'sin docente'}: ${d.dias.length} día(s) de clase entre ${d.desde} y ${d.hasta}.`;
   document.getElementById('tRep').innerHTML = d.filas.map(f => { const c = f.porcentaje >= 80 ? 'var(--verde)' : f.porcentaje >= 60 ? 'var(--ambar)' : 'var(--rojo)';
     return `<tr><td class="num"><small>${esc(f.codigo)}</small></td><td><b>${esc(f.nombre)}</b></td><td class="num">${f.puntuales}</td><td class="num">${f.atrasos}</td>
     <td class="num">${f.justificados}</td><td class="num">${f.faltas}</td><td class="num">${f.sin_salida}</td>
     <td><div style="display:flex;align-items:center;gap:10px;min-width:150px"><div class="progreso" style="flex:1"><i style="width:${Math.min(100, f.porcentaje)}%;background:${c}"></i></div><b class="num" style="color:${c};min-width:48px;text-align:right">${f.porcentaje}%</b></div></td></tr>`; }).join('');
 }
 function exportar(tipo){ location.href = `/admin/exportar/${tipo}.csv?materia=${rMateria.value || 0}&desde=${rDesde.value}&hasta=${rHasta.value}`; }
-const SEM = ['', '1ro', '2do', '3ro', '4to', '5to', '6to'];
+const SEM = ['', '1ro', '2do', '3ro', '4to', '5to', '6to', '7mo', '8vo', '9no', '10mo', '11vo', '12vo'];
+// ── carrera y semestre/año: acotan las materias del panel (f) y de reportes (r) ──
+let carreras = [];
+const NIVEL = (n, regimen) => regimen === 'anual' ? (n == 1 ? '1er' : n == 3 ? '3er' : SEM[n]) + ' año' : SEM[n] + ' semestre';
+const etiquetaMateria = m => `${esc(m.carrera_sigla || m.carrera || '')} ${esc(m.nivel_texto || '')} · ${esc(m.titulo)}${ES_ADMIN && m.docente ? ' — ' + esc(m.docente) : ''}`;
+function llenarCarreras(p){
+  const sel = document.getElementById(p + 'Carrera'), antes = sel.value;
+  const usadas = [...new Map(materias.map(m => [String(m.carrera_id), m])).values()].sort((a, b) => (a.carrera || '').localeCompare(b.carrera || ''));
+  sel.innerHTML = '<option value="0">Todas las carreras</option>' + usadas.map(m => `<option value="${m.carrera_id}">${esc(m.carrera)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === antes)) sel.value = antes;
+  filtrar(p, true, true);
+}
+function filtrar(p, soloMaterias, sinRecargar){
+  const car = document.getElementById(p + 'Carrera').value, niv = document.getElementById(p + 'Nivel');
+  if (!soloMaterias || !niv.options.length) {
+    const nivAntes = niv.value;
+    const delaCarrera = materias.filter(m => car === '0' || String(m.carrera_id) === car);
+    const niveles = [...new Set(delaCarrera.map(m => m.semestre))].sort((a, b) => a - b);
+    const reg = car === '0' ? null : (delaCarrera[0] || {}).regimen;
+    niv.innerHTML = '<option value="0">Todos</option>' + niveles.map(n => `<option value="${n}">${reg ? NIVEL(n, reg) : SEM[n] + ' (sem. o año)'}</option>`).join('');
+    if ([...niv.options].some(o => o.value === nivAntes)) niv.value = nivAntes;
+  }
+  const lista = materias.filter(m => (car === '0' || String(m.carrera_id) === car) && (niv.value === '0' || String(m.semestre) === niv.value));
+  const sel = p === 'f' ? materia : rMateria, antes = sel.value;
+  sel.innerHTML = lista.map(m => `<option value="${m.id}">${etiquetaMateria(m)}</option>`).join('');
+  if ([...sel.options].some(o => o.value === antes)) sel.value = antes;
+  if (sinRecargar) return;
+  if (p === 'f') { if (sel.value !== antes) { seguir.checked = false; elegirMateria(); } }
+  else reporte();
+}
+// alta de estudiante: carrera y su semestre/año
+function llenarAlta(){
+  const antes = eCar.value;
+  eCar.innerHTML = '<option value="0">Sin inscribir</option>' + carreras.map(c => `<option value="${c.id}">${esc(c.nombre)}</option>`).join('');
+  if ([...eCar.options].some(o => o.value === antes)) eCar.value = antes;
+  nivelesAlta();
+}
+function nivelesAlta(){
+  const c = carreras.find(x => String(x.id) === eCar.value);
+  eSem.innerHTML = c ? Array.from({length: c.duracion}, (_, i) => `<option value="${i + 1}">${NIVEL(i + 1, c.regimen)}</option>`).join('') : '<option value="0">—</option>';
+  eSem.disabled = !c;
+}
 const materia = document.getElementById('materia'), rMateria = document.getElementById('rMateria');
 function elegirMateria(){ lista = []; actualizar(true); }
 // Materias visibles (admin: todas; docente: las suyas). Si se sigue la clase en curso, elige la que corre ahora.
@@ -293,13 +338,14 @@ async function cargarMaterias(){
     const antes = materia.value;
     if (JSON.stringify(d.materias) !== JSON.stringify(materias)) {
       materias = d.materias;
-      const opciones = materias.map(m => `<option value="${m.id}">${esc(m.semestre_texto)} · ${esc(m.titulo)}${ES_ADMIN && m.docente ? ' — ' + esc(m.docente) : ''}</option>`).join('');
-      const rAntes = rMateria.value;
-      materia.innerHTML = rMateria.innerHTML = opciones;
-      if (antes) materia.value = antes;
-      if (rAntes) rMateria.value = rAntes;
+      carreras = d.carreras || [];
+      for (const p of ['f', 'r']) llenarCarreras(p);
+      llenarAlta();
+      if (antes && [...materia.options].some(o => o.value === antes)) materia.value = antes;
     }
-    if (seguir.checked && d.en_curso.length && !d.en_curso.includes(Number(materia.value))) { materia.value = d.en_curso[0]; rMateria.value = materia.value; }
+    // seguir la clase en curso, entre las materias que deja ver el filtro de carrera y semestre/año
+    const visible = d.en_curso.find(id => [...materia.options].some(o => o.value === String(id)));
+    if (seguir.checked && visible && !d.en_curso.includes(Number(materia.value))) materia.value = String(visible);
     if (materia.value !== antes) elegirMateria();
   }catch(e){}
 }

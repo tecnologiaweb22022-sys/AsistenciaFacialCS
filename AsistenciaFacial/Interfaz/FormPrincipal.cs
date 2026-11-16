@@ -27,6 +27,8 @@ namespace AsistenciaFacial.Interfaz
         readonly ComboBox _cmbMateria = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 340, Margin = new Padding(4, 5, 4, 3) };
         readonly CheckBox _chkSeguir = new CheckBox { Text = "Seguir la clase en curso", AutoSize = true, Checked = true, Margin = new Padding(12, 9, 0, 0), ForeColor = Tema.Tinta, BackColor = Color.Transparent, Cursor = Cursors.Hand };
         int _ticks;
+        readonly FiltroCurso _filtro = new FiltroCurso();
+        List<Materia> _materiasTodas = new List<Materia>();
 
         // ── estructura: barra lateral + título de página + contenido ──
         readonly BarraLateral _lateral = new BarraLateral();
@@ -394,6 +396,13 @@ namespace AsistenciaFacial.Interfaz
             _cmbMateria.SelectionChangeCommitted += (s, e) => { _chkSeguir.Checked = false; _firma = ""; Refrescar(); };
             _cmbMateria.SelectedIndexChanged += (s, e) => { _firma = ""; };
             _chkSeguir.CheckedChanged += (s, e) => { if (_chkSeguir.Checked) SeguirClase(); };
+            // por carrera y semestre/año: el filtro acota la lista de materias
+            arriba.Controls.Add(Tema.Etiqueta("Carrera", Tema.Semi, Tema.Suave));
+            arriba.Controls.Add(_filtro.Carrera);
+            arriba.Controls.Add(Tema.Etiqueta("Semestre / año", Tema.Semi, Tema.Suave));
+            arriba.Controls.Add(_filtro.Nivel);
+            arriba.SetFlowBreak(_filtro.Nivel, true);
+            _filtro.Cambio += () => LlenarMaterias(MateriaElegida?.Id);
             arriba.Controls.Add(Tema.Etiqueta("Materia", Tema.Semi, Tema.Suave));
             arriba.Controls.Add(_cmbMateria);
             arriba.Controls.Add(_chkSeguir);
@@ -643,9 +652,17 @@ namespace AsistenciaFacial.Interfaz
         void CargarMaterias()
         {
             long? antes = MateriaElegida?.Id;
-            _cmbMateria.Items.Clear();
-            foreach (var m in _db.MateriasDe(_usuario)) _cmbMateria.Items.Add(m);
+            _materiasTodas = _db.MateriasDe(_usuario);
+            _filtro.Cargar(_materiasTodas);
             ActualizarTitulo();
+            LlenarMaterias(antes);
+        }
+
+        /// <summary>Muestra en «Materia» solo las de la carrera y el semestre/año elegidos.</summary>
+        void LlenarMaterias(long? antes)
+        {
+            _cmbMateria.Items.Clear();
+            foreach (var m in _materiasTodas.Where(_filtro.Pasa)) _cmbMateria.Items.Add(m);
             if (!(_chkSeguir.Checked && SeguirClase()) && !(antes.HasValue && Seleccionar(antes.Value)) && _cmbMateria.Items.Count > 0)
                 _cmbMateria.SelectedIndex = 0;
             _firma = "";
@@ -689,8 +706,9 @@ namespace AsistenciaFacial.Interfaz
             catch (Exception ex) { _lblResumen.Text = "Error de base de datos: " + ex.Message; return; }
             var r = est.Resumen;
             _lblResumen.Text = materia == null
-                ? (_usuario.EsAdmin ? "No hay materias en la gestión activa: créalas en «Académico»." : "No tienes materias asignadas en la gestión activa.")
-                : $"{(materia.Docente.Length > 0 ? materia.Docente : "Sin docente")}      ·      {materia.TextoHorario}";
+                ? (_materiasTodas.Count > 0 ? $"No hay materias de {_filtro.Descripcion}: cambia el filtro de carrera o semestre/año."
+                   : _usuario.EsAdmin ? "No hay materias en la gestión activa: créalas en «Académico»." : "No tienes materias asignadas en la gestión activa.")
+                : $"{materia.Curso}      ·      {(materia.Docente.Length > 0 ? materia.Docente : "Sin docente")}      ·      {materia.TextoHorario}";
             _kPresentes.Valor = $"{r.Presentes}/{r.Total}";
             _kPuntuales.Valor = r.Puntuales.ToString();
             _kAtrasos.Valor = r.Atrasos.ToString();

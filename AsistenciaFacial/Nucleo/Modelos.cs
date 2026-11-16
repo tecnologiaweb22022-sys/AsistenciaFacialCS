@@ -14,9 +14,39 @@ namespace AsistenciaFacial.Nucleo
         public string Curso { get; set; } = "";
         public bool Activo { get; set; } = true;
         public int Muestras { get; set; }               // cuántas fotos de su rostro hay registradas
-        public int Semestre { get; set; }               // 1 a 6 en la gestión activa; 0 = no inscrito
+        public int Semestre { get; set; }               // nivel en la gestión activa: semestre (1 a 6) o año (1 a 3); 0 = no inscrito
+        public long CarreraId { get; set; }             // carrera de esa inscripción (0 = no inscrito)
+        public string Carrera { get; set; } = "";
+        public string Regimen { get; set; } = Carreras.Semestral;
         public double Creado { get; set; }
         public string NombreCompleto => $"{Nombres} {Apellidos}".Trim();
+        /// <summary>«Informática Industrial · 6to semestre», «Mecánica Automotriz · 2do año» o «sin inscribir».</summary>
+        public string Inscripcion => Semestre > 0 ? $"{Carrera} · {Academico.Nivel(Semestre, Regimen)}" : "sin inscribir";
+    }
+
+    /// <summary>
+    /// Carrera: semestral (Informática Industrial, 6 semestres) o anual (Mecánica Automotriz, 3 años).
+    /// El «nivel» de una materia o inscripción es el semestre o el año, según el régimen.
+    /// </summary>
+    public class Carrera
+    {
+        public long Id { get; set; }
+        public string Nombre { get; set; } = "";
+        public string Sigla { get; set; } = "";
+        public string Regimen { get; set; } = Carreras.Semestral;
+        public int Duracion { get; set; } = 6;          // cantidad de semestres o de años
+        public bool Activa { get; set; } = true;
+        public int Materias { get; set; }               // en la gestión activa
+        public int Inscritos { get; set; }              // en la gestión activa
+        public bool EsAnual => Regimen == Carreras.Anual;
+        public string TextoNivel => EsAnual ? "Año" : "Semestre";
+        public string TextoDuracion => $"{Duracion} {(EsAnual ? (Duracion == 1 ? "año" : "años") : (Duracion == 1 ? "semestre" : "semestres"))}";
+        public override string ToString() => Nombre;
+    }
+
+    public static class Carreras
+    {
+        public const string Semestral = "semestral", Anual = "anual";
     }
 
     /// <summary>Periodo académico: I-2026 (1ro, 3ro, 5to), II-2026 (2do, 4to, 6to)… Solo una está activa.</summary>
@@ -61,7 +91,11 @@ namespace AsistenciaFacial.Nucleo
         public long Id { get; set; }
         public long GestionId { get; set; }
         public string Gestion { get; set; } = "";
-        public int Semestre { get; set; }
+        public int Semestre { get; set; }               // nivel: semestre o año, según la carrera
+        public long CarreraId { get; set; }
+        public string Carrera { get; set; } = "";
+        public string CarreraSigla { get; set; } = "";
+        public string Regimen { get; set; } = Carreras.Semestral;
         public string Sigla { get; set; } = "";
         public string Nombre { get; set; } = "";
         public long? DocenteId { get; set; }
@@ -70,7 +104,11 @@ namespace AsistenciaFacial.Nucleo
         public List<BloqueHorario> Horarios { get; set; } = new List<BloqueHorario>();
         public string Titulo => $"{Sigla} {Nombre}".Trim();
         public string TextoHorario => string.Join(" · ", Horarios);
-        public override string ToString() => $"{Academico.Semestre(Semestre)} · {Titulo}";
+        /// <summary>«6to semestre», «2do año».</summary>
+        public string NivelTexto => Academico.Nivel(Semestre, Regimen);
+        /// <summary>«Informática Industrial · 6to semestre».</summary>
+        public string Curso => $"{Carrera} · {NivelTexto}";
+        public override string ToString() => $"{(CarreraSigla.Length > 0 ? CarreraSigla : Carrera)} {Academico.Nivel(Semestre, Regimen, corto: true)} · {Titulo}";
     }
 
     /// <summary>
@@ -103,6 +141,15 @@ namespace AsistenciaFacial.Nucleo
         static readonly string[] Dias = { "", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo" };
 
         public static string Semestre(int s) => s >= 0 && s < Semestres.Length ? Semestres[s] : s.ToString();
+
+        /// <summary>«6to semestre» / «6to sem.» en carreras semestrales; «1er año», «2do año», «3er año» en las anuales.</summary>
+        public static string Nivel(int n, string regimen, bool corto = false)
+        {
+            if (n <= 0) return "sin inscribir";
+            if (regimen == Carreras.Anual)
+                return (n == 1 ? "1er" : n == 3 ? "3er" : Semestre(n)) + " año";
+            return Semestre(n) + (corto ? " sem." : " semestre");
+        }
         public static string Dia(int d) => d >= 1 && d <= 7 ? Dias[d] : "?";
         public static string DiaCorto(int d) => Dia(d).Substring(0, Math.Min(3, Dia(d).Length));
         /// <summary>1 = lunes … 7 = domingo.</summary>

@@ -62,9 +62,9 @@ async function buscar(ev){
   if (!r.ok) { R.innerHTML = `<div class="error" style="margin-top:16px">${esc(d.error)}</div>`; return; }
   const e = d.estudiante;
   let html = `<div class="perfil"><div class="avatar">${esc(INICIALES(e.nombre))}</div><div><h1>${esc(e.nombre)}</h1><p class="sub">Código ${esc(e.codigo)}${e.curso ? ' · ' + esc(e.curso) : ''}` +
-    (e.semestre ? ` · <b>${esc(e.semestre_texto)} semestre</b>` : '') + '</p></div></div>';
+    (e.semestre ? ` · <b>${esc(e.inscripcion)}</b>` : '') + '</p></div></div>';
   if (!e.rostro_registrado) html += '<div class="aviso">⚠️ <span>Tu rostro todavía no está registrado: pide que lo registren.</span></div>';
-  if (!e.semestre) html += `<div class="aviso">ℹ️ <span>No estás inscrito en ningún semestre de la gestión ${esc(d.gestion)}. Avisa en dirección.</span></div>`;
+  if (!e.semestre) html += `<div class="aviso">ℹ️ <span>No estás inscrito en ninguna carrera ni semestre/año de la gestión ${esc(d.gestion)}. Avisa en dirección.</span></div>`;
   if (d.materias.length) html += '<h2>Mis materias</h2>' + d.materias.map(m => {
       const tot = Math.max(1, m.puntuales + m.atrasos + m.justificados + m.faltas), w = n => (n * 100 / tot).toFixed(1) + '%';
       return `<div class="tarjeta mat">

@@ -153,6 +153,7 @@ namespace AsistenciaFacial.Nucleo
         static object MateriaJson(Materia m) => new
         {
             id = m.Id, semestre = m.Semestre, semestre_texto = Academico.Semestre(m.Semestre), sigla = m.Sigla, nombre = m.Nombre,
+            carrera_id = m.CarreraId, carrera = m.Carrera, carrera_sigla = m.CarreraSigla, regimen = m.Regimen, nivel_texto = m.NivelTexto, curso = m.Curso,
             titulo = m.Titulo, docente = m.Docente, tolerancia_min = m.ToleranciaMin, horario = m.TextoHorario,
         };
 
@@ -361,7 +362,7 @@ namespace AsistenciaFacial.Nucleo
                     estudiante = new
                     {
                         codigo = e.Codigo, nombre = e.NombreCompleto, curso = e.Curso, rostro_registrado = e.Muestras > 0,
-                        semestre = e.Semestre, semestre_texto = Academico.Semestre(e.Semestre),
+                        semestre = e.Semestre, semestre_texto = Academico.Semestre(e.Semestre), carrera = e.Carrera, inscripcion = e.Inscripcion,
                     },
                     gestion = g?.Nombre ?? "",
                     materias,
@@ -385,6 +386,7 @@ namespace AsistenciaFacial.Nucleo
                 {
                     usuario = u.Nombre, es_admin = u.EsAdmin, gestion = _db.GestionActiva()?.Nombre ?? "",
                     materias = _db.MateriasDe(u).Select(MateriaJson), en_curso,
+                    carreras = _db.CarrerasLista(soloActivas: true).Select(c => new { id = c.Id, nombre = c.Nombre, sigla = c.Sigla, regimen = c.Regimen, duracion = c.Duracion }),
                 });
             });
             adm.MapGet("/estado", (HttpRequest peticion) => Intentar(() =>
@@ -421,6 +423,7 @@ namespace AsistenciaFacial.Nucleo
                 {
                     Id = Entero(Prop(c, "id")), Codigo = Texto(Prop(c, "codigo")), Nombres = Texto(Prop(c, "nombres")),
                     Apellidos = Texto(Prop(c, "apellidos")), Curso = Texto(Prop(c, "curso")), Semestre = (int)Entero(Prop(c, "semestre")),
+                    CarreraId = Entero(Prop(c, "carrera_id")),
                     Activo = activo.ValueKind == JsonValueKind.Undefined || Logico(activo),
                 });
                 return J(new { ok = true, id });

@@ -163,7 +163,7 @@ namespace AsistenciaFacial.Interfaz
             if (m.StartsWith("puntual") || m.StartsWith("sí") || m.Contains("activa") || m.StartsWith("configurad")) return verde;
             if (m.StartsWith("justificado")) return celeste;
             if (m.StartsWith("atraso") || m.StartsWith("falta") || m.StartsWith("sin ")) return ambar;
-            if (m.Contains("semestre")) return (MarinoClaro, MarinoMedio);
+            if (m.Contains("semestre") || m.Contains(" año")) return (MarinoClaro, MarinoMedio);
             return gris;
         }
 

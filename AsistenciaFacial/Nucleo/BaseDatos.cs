@@ -48,6 +48,10 @@ namespace AsistenciaFacial.Nucleo
             @"IF OBJECT_ID(N'gestiones', N'U') IS NULL CREATE TABLE gestiones (
     id BIGINT IDENTITY(1,1) PRIMARY KEY, nombre NVARCHAR(20) NOT NULL UNIQUE,
     inicio NVARCHAR(10) NOT NULL, fin NVARCHAR(10) NOT NULL, activa INT NOT NULL DEFAULT 0)",
+            // Carreras: semestrales (Informática Industrial, 6 semestres) o anuales (Mecánica Automotriz, 3 años).
+            @"IF OBJECT_ID(N'carreras', N'U') IS NULL CREATE TABLE carreras (
+    id BIGINT IDENTITY(1,1) PRIMARY KEY, nombre NVARCHAR(80) NOT NULL UNIQUE, sigla NVARCHAR(20) NOT NULL DEFAULT N'',
+    regimen NVARCHAR(10) NOT NULL DEFAULT N'semestral', duracion INT NOT NULL DEFAULT 6, activa INT NOT NULL DEFAULT 1)",
             // El PIN se guarda como sal:hash (PBKDF2), nunca en texto.
             @"IF OBJECT_ID(N'docentes', N'U') IS NULL CREATE TABLE docentes (
     id BIGINT IDENTITY(1,1) PRIMARY KEY, nombres NVARCHAR(60) NOT NULL, apellidos NVARCHAR(60) NOT NULL DEFAULT N'',
@@ -223,7 +227,7 @@ namespace AsistenciaFacial.Nucleo
         {
             Id = L(r, "id"), Codigo = S(r, "codigo"), Nombres = S(r, "nombres"), Apellidos = S(r, "apellidos"),
             Curso = S(r, "curso"), Activo = L(r, "activo") == 1, Muestras = (int)L(r, "muestras"), Semestre = (int)L(r, "semestre"),
-            Creado = D(r, "creado"),
+            CarreraId = L(r, "carrera_id"), Carrera = S(r, "carrera"), Regimen = Regimen(S(r, "regimen")), Creado = D(r, "creado"),
         };
 
         static Evento MapaEvento(SqlDataReader r) => new Evento
@@ -248,14 +252,29 @@ namespace AsistenciaFacial.Nucleo
         static Materia MapaMateria(SqlDataReader r) => new Materia
         {
             Id = L(r, "id"), GestionId = L(r, "gestion_id"), Gestion = S(r, "gestion"), Semestre = (int)L(r, "semestre"),
+            CarreraId = L(r, "carrera_id"), Carrera = S(r, "carrera"), CarreraSigla = S(r, "carrera_sigla"), Regimen = Regimen(S(r, "regimen")),
             Sigla = S(r, "sigla"), Nombre = S(r, "nombre"), DocenteId = LN(r, "docente_id"), Docente = S(r, "docente").Trim(),
             ToleranciaMin = (int)L(r, "tolerancia_min"),
         };
 
+        static string Regimen(string r) => r == Carreras.Anual ? Carreras.Anual : Carreras.Semestral;
+
+        static Carrera MapaCarrera(SqlDataReader r) => new Carrera
+        {
+            Id = L(r, "id"), Nombre = S(r, "nombre"), Sigla = S(r, "sigla"), Regimen = Regimen(S(r, "regimen")), Duracion = (int)L(r, "duracion"),
+            Activa = L(r, "activa") == 1, Materias = (int)L(r, "materias"), Inscritos = (int)L(r, "inscritos"),
+        };
+
+        // la inscripción en la gestión activa da el nivel (semestre o año) y la carrera
         const string SqlEstudiantes =
-            "SELECT e.*, (SELECT COUNT(*) FROM rostros r WHERE r.estudiante_id = e.id) AS muestras, " +
-            "(SELECT i.semestre FROM inscripciones i JOIN gestiones g ON g.id = i.gestion_id WHERE i.estudiante_id = e.id AND g.activa = 1) AS semestre " +
-            "FROM estudiantes e ";
+            "SELECT e.*, (SELECT COUNT(*) FROM rostros r WHERE r.estudiante_id = e.id) AS muestras, ia.semestre, ia.carrera_id, ia.carrera, ia.regimen " +
+            "FROM estudiantes e OUTER APPLY (SELECT TOP 1 i.semestre, i.carrera_id, c.nombre AS carrera, c.regimen FROM inscripciones i " +
+            "JOIN gestiones g ON g.id = i.gestion_id AND g.activa = 1 LEFT JOIN carreras c ON c.id = i.carrera_id WHERE i.estudiante_id = e.id) ia ";
+
+        const string SqlCarreras =
+            "SELECT c.*, (SELECT COUNT(*) FROM materias m JOIN gestiones g ON g.id = m.gestion_id AND g.activa = 1 WHERE m.carrera_id = c.id) AS materias, " +
+            "(SELECT COUNT(*) FROM inscripciones i JOIN gestiones g ON g.id = i.gestion_id AND g.activa = 1 WHERE i.carrera_id = c.id) AS inscritos " +
+            "FROM carreras c ";
 
         const string SqlGestiones =
             "SELECT g.*, (SELECT COUNT(*) FROM materias m WHERE m.gestion_id = g.id) AS materias, " +
@@ -266,8 +285,9 @@ namespace AsistenciaFacial.Nucleo
             "FROM docentes d ";
 
         const string SqlMaterias =
-            "SELECT m.*, g.nombre AS gestion, CONCAT(COALESCE(d.nombres, ''), ' ', COALESCE(d.apellidos, '')) AS docente " +
-            "FROM materias m JOIN gestiones g ON g.id = m.gestion_id LEFT JOIN docentes d ON d.id = m.docente_id ";
+            "SELECT m.*, g.nombre AS gestion, CONCAT(COALESCE(d.nombres, ''), ' ', COALESCE(d.apellidos, '')) AS docente, " +
+            "c.nombre AS carrera, c.sigla AS carrera_sigla, c.regimen " +
+            "FROM materias m JOIN gestiones g ON g.id = m.gestion_id LEFT JOIN docentes d ON d.id = m.docente_id LEFT JOIN carreras c ON c.id = m.carrera_id ";
 
         // ───────────────────────── creación ─────────────────────────
         /// <summary>
@@ -328,6 +348,7 @@ namespace AsistenciaFacial.Nucleo
             Ddl(AgregarColumna("asistencias", "fuente_salida", "NVARCHAR(20) NULL"));
             // Ingreso con usuario y contraseña: a los docentes existentes se les crea un usuario a partir de su nombre.
             Ddl(AgregarColumna("docentes", "usuario", "NVARCHAR(40) NULL"));
+            ACarreras();
             Operacion(s =>
             {
                 var sinUsuario = s.Consultar("SELECT id, nombres, apellidos FROM docentes WHERE usuario IS NULL OR usuario = N''",
@@ -345,6 +366,32 @@ namespace AsistenciaFacial.Nucleo
         }
 
         static bool Reservado(string usuario) => usuario == "admin" || usuario == "administrador";
+
+        /// <summary>
+        /// Carreras: crea las dos de la institución si no hay ninguna y asigna las materias e inscripciones
+        /// que todavía no tienen carrera a la primera (Informática Industrial: hasta ahora todo era de esa carrera).
+        /// </summary>
+        void ACarreras()
+        {
+            Ddl(AgregarColumna("materias", "carrera_id", "BIGINT NULL REFERENCES carreras(id)"));
+            Ddl(AgregarColumna("inscripciones", "carrera_id", "BIGINT NULL REFERENCES carreras(id)"));
+            Ddl(Indice("materias", "ix_materias_carrera", "carrera_id, semestre"));
+            Operacion(s =>
+            {
+                if (s.Numero("SELECT COUNT(*) FROM carreras") == 0)
+                {
+                    s.Ejecutar("INSERT INTO carreras (nombre, sigla, regimen, duracion, activa) VALUES (N'Informática Industrial', N'INF', N'semestral', 6, 1)");
+                    s.Ejecutar("INSERT INTO carreras (nombre, sigla, regimen, duracion, activa) VALUES (N'Mecánica Automotriz', N'MEC', N'anual', 3, 1)");
+                }
+                long primera = (long)s.Numero("SELECT MIN(id) FROM carreras");
+                int m = s.Ejecutar("UPDATE materias SET carrera_id = @primera WHERE carrera_id IS NULL", new { primera });
+                int i = s.Ejecutar("UPDATE inscripciones SET carrera_id = @primera WHERE carrera_id IS NULL", new { primera });
+                if (m + i > 0)
+                    RegistrarEvento(s, null, "carreras", $"Base actualizada a carreras: {m} materia(s) y {i} inscripción(es) quedaron en la carrera por defecto. " +
+                                                         "Revisa «Académico → Carreras».", "normal", "sistema");
+                return 0;
+            });
+        }
 
         void AMaterias(Configuracion legado)
         {
@@ -560,10 +607,10 @@ namespace AsistenciaFacial.Nucleo
                 var materias = MateriasDe(s, "WHERE m.gestion_id = @origen", new { origen });
                 var existentes = MateriasDe(s, "WHERE m.gestion_id = @destino", new { destino });
                 int n = 0;
-                foreach (var m in materias.Where(m => !existentes.Any(x => x.Semestre == m.Semestre && x.Nombre == m.Nombre)))
+                foreach (var m in materias.Where(m => !existentes.Any(x => x.CarreraId == m.CarreraId && x.Semestre == m.Semestre && x.Nombre == m.Nombre)))
                 {
-                    long id = s.Insertar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@destino, @semestre, @sigla, @nombre, @docente, @tol)",
-                        new { destino, semestre = m.Semestre, sigla = m.Sigla, nombre = m.Nombre, docente = m.DocenteId, tol = m.ToleranciaMin });
+                    long id = s.Insertar("INSERT INTO materias (gestion_id, carrera_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@destino, @carrera, @semestre, @sigla, @nombre, @docente, @tol)",
+                        new { destino, carrera = m.CarreraId, semestre = m.Semestre, sigla = m.Sigla, nombre = m.Nombre, docente = m.DocenteId, tol = m.ToleranciaMin });
                     foreach (var b in m.Horarios)
                         s.Ejecutar("INSERT INTO horarios (materia_id, dia, inicio, fin) VALUES (@id, @dia, @inicio, @fin)", new { id, dia = b.Dia, inicio = b.Inicio, fin = b.Fin });
                     n++;
@@ -573,19 +620,69 @@ namespace AsistenciaFacial.Nucleo
         }
 
         /// <summary>
-        /// Inscribe en «destino» a los estudiantes activos de «origen» en el semestre siguiente
-        /// (los de 6to egresan). No toca a quien ya esté inscrito en «destino».
+        /// Inscribe en «destino» a los estudiantes activos de «origen», en su misma carrera:
+        ///  • carreras semestrales: pasan al semestre siguiente;
+        ///  • carreras anuales: pasan al año siguiente solo si «destino» es de un año posterior
+        ///    (de II-2026 a I-2027); de I a II del mismo año siguen en el mismo año.
+        /// Quien termina la carrera egresa (no se inscribe). No toca a quien ya esté inscrito en «destino».
         /// </summary>
         public int PromoverEstudiantes(long origen, long destino)
         {
             if (origen == destino) throw new ErrorValidacion("Elige una gestión distinta");
-            return Operacion(s => s.Ejecutar(
-                "INSERT INTO inscripciones (estudiante_id, gestion_id, semestre) " +
-                "SELECT i.estudiante_id, @destino, i.semestre + 1 FROM inscripciones i JOIN estudiantes e ON e.id = i.estudiante_id " +
-                "WHERE i.gestion_id = @origen AND i.semestre < 6 AND e.activo = 1 " +
-                "AND NOT EXISTS (SELECT 1 FROM inscripciones x WHERE x.estudiante_id = i.estudiante_id AND x.gestion_id = @destino)",
-                new { origen, destino }));
+            return Operacion(s =>
+            {
+                var g = s.Consultar(SqlGestiones + "WHERE g.id IN (@origen, @destino)", MapaGestion, new { origen, destino });
+                string AnioDe(long id) => (g.FirstOrDefault(x => x.Id == id)?.Inicio ?? "").PadRight(4).Substring(0, 4);
+                int cambioDeAnio = string.CompareOrdinal(AnioDe(destino), AnioDe(origen)) > 0 ? 1 : 0;
+                const string siguiente = "i.semestre + CASE WHEN c.regimen = N'anual' AND @cambioDeAnio = 0 THEN 0 ELSE 1 END";
+                return s.Ejecutar(
+                    "INSERT INTO inscripciones (estudiante_id, gestion_id, semestre, carrera_id) " +
+                    $"SELECT i.estudiante_id, @destino, {siguiente}, i.carrera_id FROM inscripciones i " +
+                    "JOIN estudiantes e ON e.id = i.estudiante_id JOIN carreras c ON c.id = i.carrera_id " +
+                    $"WHERE i.gestion_id = @origen AND e.activo = 1 AND {siguiente} <= c.duracion " +
+                    "AND NOT EXISTS (SELECT 1 FROM inscripciones x WHERE x.estudiante_id = i.estudiante_id AND x.gestion_id = @destino)",
+                    new { origen, destino, cambioDeAnio });
+            });
         }
+
+        // ───────────────────────── carreras ─────────────────────────
+        public List<Carrera> CarrerasLista(bool soloActivas = false) => Operacion(s =>
+            s.Consultar(SqlCarreras + (soloActivas ? "WHERE c.activa = 1 " : "") + "ORDER BY c.nombre", MapaCarrera));
+
+        static Carrera CarreraDe(Sesion s, long id) => s.Consultar(SqlCarreras + "WHERE c.id = @id", MapaCarrera, new { id }).FirstOrDefault();
+
+        public long GuardarCarrera(Carrera c)
+        {
+            string nombre = (c.Nombre ?? "").Trim(), sigla = (c.Sigla ?? "").Trim().ToUpperInvariant(), regimen = Regimen(c.Regimen);
+            if (nombre.Length == 0) throw new ErrorValidacion("Escribe el nombre de la carrera");
+            if (nombre.Length > 80 || sigla.Length > 20) throw new ErrorValidacion("Texto demasiado largo");
+            if (c.Duracion < 1 || c.Duracion > 12) throw new ErrorValidacion("La duración debe estar entre 1 y 12 (semestres o años)");
+            return Operacion(s =>
+            {
+                if (s.Numero("SELECT COUNT(*) FROM carreras WHERE nombre = @nombre AND id <> @id", new { nombre, id = c.Id }) > 0)
+                    throw new ErrorValidacion($"Ya existe la carrera «{nombre}»");
+                if (c.Id > 0)
+                {
+                    int fuera = (int)s.Numero("SELECT (SELECT COUNT(*) FROM materias WHERE carrera_id = @id AND semestre > @d) + " +
+                                              "(SELECT COUNT(*) FROM inscripciones WHERE carrera_id = @id AND semestre > @d)", new { id = c.Id, d = c.Duracion });
+                    if (fuera > 0) throw new ErrorValidacion($"Hay {fuera} materia(s) o inscripción(es) en un nivel mayor que {c.Duracion}: corrígelas antes de acortar la carrera.");
+                    s.Ejecutar("UPDATE carreras SET nombre = @nombre, sigla = @sigla, regimen = @regimen, duracion = @duracion, activa = @activa WHERE id = @id",
+                        new { id = c.Id, nombre, sigla, regimen, duracion = c.Duracion, activa = c.Activa ? 1 : 0 });
+                    return c.Id;
+                }
+                return s.Insertar("INSERT INTO carreras (nombre, sigla, regimen, duracion, activa) VALUES (@nombre, @sigla, @regimen, @duracion, @activa)",
+                    new { nombre, sigla, regimen, duracion = c.Duracion, activa = c.Activa ? 1 : 0 });
+            });
+        }
+
+        /// <summary>Solo si ninguna materia ni inscripción (de ninguna gestión) la usa: así no se pierde historial.</summary>
+        public void EliminarCarrera(long id) => Operacion(s =>
+        {
+            var c = CarreraDe(s, id) ?? throw new ErrorValidacion("La carrera no existe");
+            int uso = (int)s.Numero("SELECT (SELECT COUNT(*) FROM materias WHERE carrera_id = @id) + (SELECT COUNT(*) FROM inscripciones WHERE carrera_id = @id)", new { id });
+            if (uso > 0) throw new ErrorValidacion($"«{c.Nombre}» tiene {uso} materia(s) o inscripción(es) (también de gestiones pasadas): no se elimina. Si ya no se dicta, desmárcala como activa.");
+            s.Ejecutar("DELETE FROM carreras WHERE id = @id", new { id });
+        });
 
         // ───────────────────────── docentes ─────────────────────────
         public List<Docente> Docentes(bool soloActivos = false) => Operacion(s =>
@@ -640,7 +737,7 @@ namespace AsistenciaFacial.Nucleo
         // ───────────────────────── materias y horarios ─────────────────────────
         static List<Materia> MateriasDe(Sesion s, string where, object p = null)
         {
-            var lista = s.Consultar(SqlMaterias + where + " ORDER BY m.semestre, m.nombre", MapaMateria, p);
+            var lista = s.Consultar(SqlMaterias + where + " ORDER BY c.nombre, m.semestre, m.nombre", MapaMateria, p);
             if (lista.Count == 0) return lista;
             var porId = lista.ToDictionary(m => m.Id);
             // los id son números de la propia base: se pueden escribir directo en el IN (...)
@@ -667,7 +764,6 @@ namespace AsistenciaFacial.Nucleo
             string nombre = (m.Nombre ?? "").Trim(), sigla = (m.Sigla ?? "").Trim().ToUpperInvariant();
             if (nombre.Length == 0) throw new ErrorValidacion("Escribe el nombre de la materia");
             if (nombre.Length > 100 || sigla.Length > 20) throw new ErrorValidacion("Texto demasiado largo");
-            if (m.Semestre < 1 || m.Semestre > 6) throw new ErrorValidacion("Elige el semestre (1ro a 6to)");
             if (m.ToleranciaMin < 0 || m.ToleranciaMin > 120) throw new ErrorValidacion("La tolerancia debe estar entre 0 y 120 minutos");
             var bloques = m.Horarios ?? new List<BloqueHorario>();
             if (bloques.Count == 0) throw new ErrorValidacion("Agrega al menos un día al horario (si no, la cámara nunca marcará en esta materia)");
@@ -686,19 +782,23 @@ namespace AsistenciaFacial.Nucleo
             return Operacion(s =>
             {
                 if (s.Numero("SELECT COUNT(*) FROM gestiones WHERE id = @id", new { id = m.GestionId }) == 0) throw new ErrorValidacion("Elige la gestión");
-                // Un semestre no puede tener dos clases a la vez: la cámara no sabría en cuál marcar.
-                foreach (var otra in MateriasDe(s, "WHERE m.gestion_id = @g AND m.semestre = @sem AND m.id <> @id", new { g = m.GestionId, sem = m.Semestre, id = m.Id }))
+                var carrera = CarreraDe(s, m.CarreraId) ?? throw new ErrorValidacion("Elige la carrera");
+                if (m.Semestre < 1 || m.Semestre > carrera.Duracion)
+                    throw new ErrorValidacion($"Elige el {carrera.TextoNivel.ToLowerInvariant()} (de 1 a {carrera.Duracion} en {carrera.Nombre})");
+                // Un curso (misma carrera y mismo semestre/año) no puede tener dos clases a la vez: la cámara no sabría en cuál marcar.
+                foreach (var otra in MateriasDe(s, "WHERE m.gestion_id = @g AND m.carrera_id = @car AND m.semestre = @sem AND m.id <> @id",
+                             new { g = m.GestionId, car = m.CarreraId, sem = m.Semestre, id = m.Id }))
                     foreach (var b in bloques)
                         foreach (var o in otra.Horarios.Where(o => Choca(b, o)))
-                            throw new ErrorValidacion($"{b} choca con «{otra.Titulo}» ({o}). Un semestre no puede tener dos clases a la vez.");
-                var v = new { id = m.Id, gestion = m.GestionId, semestre = m.Semestre, sigla, nombre, docente = m.DocenteId, tol = m.ToleranciaMin };
+                            throw new ErrorValidacion($"{b} choca con «{otra.Titulo}» ({o}). {carrera.Nombre} · {Academico.Nivel(m.Semestre, carrera.Regimen)} no puede tener dos clases a la vez.");
+                var v = new { id = m.Id, gestion = m.GestionId, carrera = m.CarreraId, semestre = m.Semestre, sigla, nombre, docente = m.DocenteId, tol = m.ToleranciaMin };
                 long id = m.Id;
                 if (id > 0)
-                    s.Ejecutar("UPDATE materias SET gestion_id = @gestion, semestre = @semestre, sigla = @sigla, nombre = @nombre, docente_id = @docente, " +
+                    s.Ejecutar("UPDATE materias SET gestion_id = @gestion, carrera_id = @carrera, semestre = @semestre, sigla = @sigla, nombre = @nombre, docente_id = @docente, " +
                                "tolerancia_min = @tol WHERE id = @id", v);
                 else
                 {
-                    id = s.Insertar("INSERT INTO materias (gestion_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@gestion, @semestre, @sigla, @nombre, @docente, @tol)", v);
+                    id = s.Insertar("INSERT INTO materias (gestion_id, carrera_id, semestre, sigla, nombre, docente_id, tolerancia_min) VALUES (@gestion, @carrera, @semestre, @sigla, @nombre, @docente, @tol)", v);
                 }
                 s.Ejecutar("DELETE FROM horarios WHERE materia_id = @id", new { id });
                 foreach (var b in bloques.OrderBy(b => b.Dia).ThenBy(b => b.HoraInicio))
@@ -758,7 +858,7 @@ namespace AsistenciaFacial.Nucleo
             if (nombres.Length == 0) throw new ErrorValidacion("Escribe el nombre del estudiante");
             if (codigo.Length > 30 || nombres.Length > 60 || apellidos.Length > 60 || (e.Curso ?? "").Trim().Length > 100)
                 throw new ErrorValidacion("Texto demasiado largo");
-            if (conSemestre && (e.Semestre < 0 || e.Semestre > 6)) throw new ErrorValidacion("Semestre inválido (1ro a 6to)");
+            if (conSemestre && e.Semestre < 0) throw new ErrorValidacion("Nivel inválido");
             return Operacion(s =>
             {
                 var otro = s.Consultar("SELECT id FROM estudiantes WHERE codigo=@codigo AND id!=@id", r => L(r, "id"), new { codigo, id = e.Id });
@@ -776,9 +876,15 @@ namespace AsistenciaFacial.Nucleo
                     long gestion = GestionActivaId(s);
                     if (gestion == 0 && e.Semestre > 0) throw new ErrorValidacion("No hay gestión activa: créala en «Académico» para inscribir estudiantes");
                     if (e.Semestre == 0) s.Ejecutar("DELETE FROM inscripciones WHERE estudiante_id = @id AND gestion_id = @gestion", new { id, gestion });
-                    else s.Ejecutar("UPDATE inscripciones SET semestre = @semestre WHERE estudiante_id = @id AND gestion_id = @gestion; " +
-                                    "IF @@ROWCOUNT = 0 INSERT INTO inscripciones (estudiante_id, gestion_id, semestre) VALUES (@id, @gestion, @semestre)",
-                                    new { id, gestion, semestre = e.Semestre });
+                    else
+                    {
+                        var carrera = CarreraDe(s, e.CarreraId) ?? throw new ErrorValidacion("Elige la carrera del estudiante");
+                        if (e.Semestre > carrera.Duracion)
+                            throw new ErrorValidacion($"{carrera.Nombre} tiene {carrera.TextoDuracion}: elige un {carrera.TextoNivel.ToLowerInvariant()} de 1 a {carrera.Duracion}");
+                        s.Ejecutar("UPDATE inscripciones SET semestre = @semestre, carrera_id = @carrera WHERE estudiante_id = @id AND gestion_id = @gestion; " +
+                                   "IF @@ROWCOUNT = 0 INSERT INTO inscripciones (estudiante_id, gestion_id, semestre, carrera_id) VALUES (@id, @gestion, @semestre, @carrera)",
+                                   new { id, gestion, semestre = e.Semestre, carrera = carrera.Id });
+                    }
                 }
                 return id;
             });
@@ -798,13 +904,24 @@ namespace AsistenciaFacial.Nucleo
         }
 
         /// <summary>
-        /// Importa una lista CSV: codigo,nombres,apellidos,curso,semestre (acepta ; o , y encabezado).
-        /// El semestre (1 a 6, «4to», «cuarto») es opcional: si viene, inscribe en la gestión activa.
+        /// Importa una lista CSV: codigo,nombres,apellidos,curso,semestre,carrera (acepta ; o , y encabezado).
+        /// El nivel (semestre o año: 1, «4to», «cuarto») es opcional: si viene, inscribe en la gestión activa.
+        /// La carrera se toma de la 6.ª columna, o de «curso» si coincide con una carrera, o es la única que hay.
         /// </summary>
         public (int nuevos, int actualizados, List<string> errores) ImportarCsv(string texto)
         {
             int nuevos = 0, act = 0;
             var errores = new List<string>();
+            var carreras = CarrerasLista(soloActivas: true);
+            // «INF», «informatica industrial» o «Informática Industrial - 6to semestre» → la carrera (sin tildes ni mayúsculas)
+            static string Norm(string t) => Claves.NormalizarUsuario(t);
+            Carrera Buscar(string t)
+            {
+                string q = Norm(t);
+                if (q.Length == 0) return null;
+                return carreras.FirstOrDefault(c => q == Norm(c.Sigla) || q == Norm(c.Nombre))
+                    ?? carreras.FirstOrDefault(c => q.Contains(Norm(c.Nombre)));
+            }
             int n = 0;
             foreach (var linea in texto.Replace("\r", "").Split('\n'))
             {
@@ -815,14 +932,16 @@ namespace AsistenciaFacial.Nucleo
                 if (n == 1 && c[0].ToLowerInvariant().StartsWith("cod")) continue;      // encabezado
                 if (c.Length < 2) { errores.Add($"Línea {n}: faltan columnas"); continue; }
                 int semestre = c.Length > 4 ? Academico.LeerSemestre(c[4]) : 0;
-                if (semestre < 0) { errores.Add($"Línea {n}: semestre «{c[4]}» no válido (usa 1 a 6)"); continue; }
+                if (semestre < 0) { errores.Add($"Línea {n}: semestre o año «{c[4]}» no válido (usa un número)"); continue; }
+                var carrera = (c.Length > 5 ? Buscar(c[5]) : null) ?? (c.Length > 3 ? Buscar(c[3]) : null) ?? (carreras.Count == 1 ? carreras[0] : null);
+                if (semestre > 0 && carrera == null) { errores.Add($"Línea {n}: indica la carrera (6.ª columna: nombre o sigla)"); continue; }
                 var existe = EstudiantePorCodigo(c[0]);
                 try
                 {
                     GuardarEstudiante(new Estudiante
                     {
                         Id = existe?.Id ?? 0, Codigo = c[0], Nombres = c[1], Apellidos = c.Length > 2 ? c[2] : "",
-                        Curso = c.Length > 3 ? c[3] : "", Activo = true, Semestre = semestre,
+                        Curso = c.Length > 3 ? c[3] : "", Activo = true, Semestre = semestre, CarreraId = carrera?.Id ?? 0,
                     }, conSemestre: semestre > 0);
                     if (existe == null) nuevos++; else act++;
                 }
@@ -884,7 +1003,7 @@ namespace AsistenciaFacial.Nucleo
                 r => B(r, "foto"), new { estudianteId }).FirstOrDefault());
 
         // ───────────────────────── marcas de asistencia ─────────────────────────
-        // Lista de UNA materia en UN día: los inscritos en su semestre (y quien ya tenga marca).
+        // Lista de UNA materia en UN día: los inscritos en su carrera y semestre/año (y quien ya tenga marca).
         const string SqlFila =
             "SELECT e.id AS estudiante_id, e.codigo, e.nombres, e.apellidos, e.curso, " +
             "(SELECT COUNT(*) FROM rostros r WHERE r.estudiante_id = e.id) AS muestras, " +
@@ -926,9 +1045,9 @@ namespace AsistenciaFacial.Nucleo
                     Muestras = est.Muestras, Fecha = fecha,
                 };
                 if (est.Semestre == 0) return new ResultadoMarca { Fila = sinMarca, Motivo = "no está inscrito en la gestión activa" };
-                var clases = ClasesEn(s, ahora, h).Where(c => c.Materia.Semestre == est.Semestre).ToList();
+                var clases = ClasesEn(s, ahora, h).Where(c => c.Materia.Semestre == est.Semestre && c.Materia.CarreraId == est.CarreraId).ToList();
                 if (clases.Count == 0)
-                    return new ResultadoMarca { Fila = sinMarca, Motivo = $"{Academico.Semestre(est.Semestre)} semestre no tiene clase a esta hora" };
+                    return new ResultadoMarca { Fila = sinMarca, Motivo = $"{est.Inscripcion} no tiene clase a esta hora" };
                 var t = ahora.TimeOfDay;
                 FilaAsistencia fila = null;
                 bool termino = false;
@@ -1022,7 +1141,7 @@ namespace AsistenciaFacial.Nucleo
         }
 
         public List<FilaAsistencia> ListaDelDia(long materiaId, string fecha) => Operacion(s =>
-            s.Consultar(SqlFila + "WHERE (e.activo = 1 AND i.semestre = m.semestre) OR a.id IS NOT NULL ORDER BY e.apellidos, e.nombres",
+            s.Consultar(SqlFila + "WHERE (e.activo = 1 AND i.semestre = m.semestre AND i.carrera_id = m.carrera_id) OR a.id IS NOT NULL ORDER BY e.apellidos, e.nombres",
                 MapaFila, new { fecha, materiaId }));
 
         public static ResumenDia Resumir(string fecha, List<FilaAsistencia> lista) => new ResumenDia
@@ -1072,7 +1191,7 @@ namespace AsistenciaFacial.Nucleo
                 " SUM(CASE WHEN a.estado='justificado' THEN 1 ELSE 0 END) AS j, " +
                 "SUM(CASE WHEN a.estado IN ('puntual', 'atraso') AND a.hora_salida IS NULL AND a.fecha < @hoy THEN 1 ELSE 0 END) AS ss " +
                 "FROM estudiantes e JOIN materias m ON m.id = @materiaId " +
-                "JOIN inscripciones i ON i.estudiante_id = e.id AND i.gestion_id = m.gestion_id AND i.semestre = m.semestre " +
+                "JOIN inscripciones i ON i.estudiante_id = e.id AND i.gestion_id = m.gestion_id AND i.semestre = m.semestre AND i.carrera_id = m.carrera_id " +
                 "LEFT JOIN asistencias a ON a.estudiante_id = e.id AND a.materia_id = m.id AND a.fecha BETWEEN @desde AND @hasta " +
                 "WHERE e.activo = 1 GROUP BY e.id, e.codigo, e.nombres, e.apellidos ORDER BY e.apellidos, e.nombres",
                 r =>
@@ -1098,7 +1217,7 @@ namespace AsistenciaFacial.Nucleo
             string hasta = string.CompareOrdinal(Hoy(), g.Fin) < 0 ? Hoy() : g.Fin;
             return Operacion(s =>
             {
-                var v = new { est = e.Id, g = g.Id, sem = e.Semestre, desde = g.Inicio, hasta, hoy = Hoy() };
+                var v = new { est = e.Id, g = g.Id, sem = e.Semestre, car = e.CarreraId, desde = g.Inicio, hasta, hoy = Hoy() };
                 var materias = s.Consultar(
                     "SELECT m.id, m.sigla, m.nombre, CONCAT(COALESCE(d.nombres, ''), ' ', COALESCE(d.apellidos, '')) AS docente, " +
                     " (SELECT COUNT(DISTINCT a2.fecha) FROM asistencias a2 WHERE a2.materia_id = m.id AND a2.fecha BETWEEN @desde AND @hasta) AS dias, " +
@@ -1107,7 +1226,7 @@ namespace AsistenciaFacial.Nucleo
                     " SUM(CASE WHEN a.estado IN ('puntual', 'atraso') AND a.hora_salida IS NULL AND a.fecha < @hoy THEN 1 ELSE 0 END) AS ss " +
                     "FROM materias m LEFT JOIN docentes d ON d.id = m.docente_id " +
                     "LEFT JOIN asistencias a ON a.materia_id = m.id AND a.estudiante_id = @est AND a.fecha BETWEEN @desde AND @hasta " +
-                    "WHERE m.gestion_id = @g AND m.semestre = @sem GROUP BY m.id, m.sigla, m.nombre, d.nombres, d.apellidos ORDER BY m.nombre",
+                    "WHERE m.gestion_id = @g AND m.semestre = @sem AND m.carrera_id = @car GROUP BY m.id, m.sigla, m.nombre, d.nombres, d.apellidos ORDER BY m.nombre",
                     r =>
                     {
                         int dias = (int)L(r, "dias"), p = (int)L(r, "p"), t = (int)L(r, "t"), j = (int)L(r, "j");
@@ -1123,7 +1242,7 @@ namespace AsistenciaFacial.Nucleo
                 var dias = s.Consultar(
                     "SELECT TOP 200 x.fecha, m.id AS materia_id, m.sigla, m.nombre AS materia, a.hora, a.hora_salida, a.estado, a.observacion " +
                     "FROM (SELECT DISTINCT materia_id, fecha FROM asistencias WHERE fecha BETWEEN @desde AND @hasta) x " +
-                    "JOIN materias m ON m.id = x.materia_id AND m.gestion_id = @g AND m.semestre = @sem " +
+                    "JOIN materias m ON m.id = x.materia_id AND m.gestion_id = @g AND m.semestre = @sem AND m.carrera_id = @car " +
                     "LEFT JOIN asistencias a ON a.materia_id = x.materia_id AND a.fecha = x.fecha AND a.estudiante_id = @est " +
                     "ORDER BY x.fecha DESC, m.nombre",
                     r => new FilaAsistencia
@@ -1164,9 +1283,9 @@ namespace AsistenciaFacial.Nucleo
                                 r.Justificados.ToString(), r.Faltas.ToString(), r.SinSalida.ToString(), r.Porcentaje.ToString("0.0", inv) }));
                     break;
                 case "estudiantes":
-                    sb.AppendLine("codigo,nombres,apellidos,curso,semestre,activo,muestras_rostro");
+                    sb.AppendLine("codigo,nombres,apellidos,curso,semestre_o_anio,carrera,activo,muestras_rostro");
                     foreach (var e in Estudiantes())
-                        sb.AppendLine(Csv(new[] { e.Codigo, e.Nombres, e.Apellidos, e.Curso, e.Semestre > 0 ? e.Semestre.ToString() : "",
+                        sb.AppendLine(Csv(new[] { e.Codigo, e.Nombres, e.Apellidos, e.Curso, e.Semestre > 0 ? e.Semestre.ToString() : "", e.Carrera,
                             e.Activo ? "1" : "0", e.Muestras.ToString() }));
                     break;
                 case "eventos":

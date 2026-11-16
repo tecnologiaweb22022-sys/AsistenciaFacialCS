@@ -68,7 +68,7 @@
   <div class="clases" id="clases"><div class="clase vacio">Cargando…</div></div>
   <div class="pie2">
     <div class="txt"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="10" r="3"/><path d="M7.5 17.5c1-2 2.6-3 4.5-3s3.5 1 4.5 3"/></svg></div>
-      <div><b>Al llegar, mira a la cámara</b><small>Se registra en la materia de tu semestre que tiene clase ahora.</small></div></div>
+      <div><b>Al llegar, mira a la cámara</b><small>Se registra en la materia de tu carrera y semestre/año que tiene clase ahora.</small></div></div>
     <div class="acc"><a href="/marcar" id="lnkMarcar" hidden><button>📷 Marcar con selfie</button></a><a href="/mi-asistencia"><button class="sec">Consultar mi asistencia</button></a></div>
   </div>
 </main>
@@ -91,7 +91,7 @@ function tarjeta(c){
       <span class="der"><time>${x.hora}${x.salida ? ' → ' + x.salida : ''}</time><span class="st st-${x.estado}">${ESTADO[x.estado] || x.estado}</span></span></div>`;
   }).join('');
   return `<article class="clase">
-    <div><span class="sem">${esc(m.semestre_texto)} semestre</span></div>
+    <div><span class="sem">${esc(m.curso || m.semestre_texto + ' semestre')}</span></div>
     <h2>${esc(m.titulo)}</h2>
     <div class="meta"><span>${esc(m.docente || 'Sin docente')}</span><span>${c.clase.inicio}–${c.clase.fin}</span><span>Puntual hasta <b>${c.clase.limite}</b></span></div>
     <div class="anillo-fila">
